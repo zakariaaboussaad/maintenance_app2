@@ -188,15 +188,15 @@ class TicketController extends Controller
 
             $ticket = Ticket::findOrFail($id);
 
-            // Vérifier si le ticket est déjà assigné
-            if (!is_null($ticket->technicien_assigne)) {
+            // Si déjà assigné au même technicien, ne rien changer
+            if (!is_null($ticket->technicien_assigne) && (int)$ticket->technicien_assigne === (int)$request->technician_id) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Ce ticket est déjà assigné à un technicien'
-                ], 400);
+                    'success' => true,
+                    'message' => 'Ticket déjà assigné à ce technicien'
+                ]);
             }
 
-            // Assigner le ticket
+            // Assigner ou réassigner le ticket
             $ticket->technicien_assigne = $request->technician_id;
             $ticket->date_assignation = now();
             // Mettre le status en "en_cours" lorsqu'un technicien prend le ticket
