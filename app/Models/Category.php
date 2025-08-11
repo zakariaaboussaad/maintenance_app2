@@ -10,7 +10,7 @@ class Category extends Model
     use HasFactory;
 
     protected $table = 'categories';
-    protected $primaryKey = 'id_categorie';
+    protected $primaryKey = 'id';
 
     /**
      * The attributes that are mass assignable.
@@ -18,7 +18,7 @@ class Category extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'nom_categorie',
+        'nom',
         'description',
         'couleur',
         'is_active',
@@ -41,7 +41,7 @@ class Category extends Model
      */
     public function pannes()
     {
-        return $this->hasMany(Panne::class, 'categorie_id', 'id_categorie');
+        return $this->hasMany(Panne::class, 'categorie_id', 'id');
     }
 
     /**
@@ -49,7 +49,7 @@ class Category extends Model
      */
     public function tickets()
     {
-        return $this->hasMany(Ticket::class, 'categorie_id', 'id_categorie');
+        return $this->hasMany(Ticket::class, 'categorie_id', 'id');
     }
 
     /**

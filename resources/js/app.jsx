@@ -1,245 +1,103 @@
-import './bootstrap';
-import '../css/app.css';
-
 import React, { useState, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
+import LoginForm from './components/auth/LoginForm.jsx';
+import RoleBasedRouter from './components/RoleBasedRouter.jsx';
 
-// Composant principal
-const App = () => {
-    const [equipements, setEquipements] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [selectedEquipement, setSelectedEquipement] = useState(null);
+const MaintenanceApp = () => {
+    const [user, setUser] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Récupérer les équipements
     useEffect(() => {
-        fetchEquipements();
+        // Check if user is already logged in
+        const savedUser = sessionStorage.getItem('user');
+        if (savedUser) {
+            try {
+                setUser(JSON.parse(savedUser));
+            } catch (error) {
+                console.error('Error parsing saved user:', error);
+                sessionStorage.removeItem('user');
+            }
+        }
+
+        setTimeout(() => {
+            setIsLoading(false);
+        }, 1000);
     }, []);
 
-    const fetchEquipements = async () => {
-        try {
-            setLoading(true);
-            const response = await fetch('/api/equipements');
-            const data = await response.json();
-
-            if (data.success) {
-                setEquipements(data.data);
-            } else {
-                setError('Erreur lors du chargement des équipements');
-            }
-        } catch (err) {
-            setError('Erreur de connexion à l\'API');
-            console.error('Erreur:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const showEquipementDetails = async (id) => {
-        try {
-            const response = await fetch(`/api/equipements/${id}`);
-            const data = await response.json();
-
-            if (data.success) {
-                setSelectedEquipement(data.data);
-            }
-        } catch (err) {
-            console.error('Erreur:', err);
-        }
-    };
-
-    const getStatusColor = (status) => {
-        const colors = {
-            'active': 'bg-green-100 text-green-800',
-            'maintenance': 'bg-yellow-100 text-yellow-800',
-            'hors_service': 'bg-red-100 text-red-800'
-        };
-        return colors[status] || 'bg-gray-100 text-gray-800';
-    };
-
-    const getStatusText = (status) => {
-        const texts = {
-            'active': 'Actif',
-            'maintenance': 'En maintenance',
-            'hors_service': 'Hors service'
-        };
-        return texts[status] || status;
-    };
-
-    if (loading) {
+    if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500"></div>
-                <span className="ml-3 text-lg">Chargement...</span>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                    <strong className="font-bold">Erreur!</strong>
-                    <span className="block sm:inline"> {error}</span>
-                    <button
-                        onClick={fetchEquipements}
-                        className="mt-2 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                    >
-                        Réessayer
-                    </button>
+            <div style={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#f8fafc',
+                fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexDirection: 'column',
+                    gap: '16px'
+                }}>
+                    <div style={{
+                        width: '64px',
+                        height: '64px',
+                        border: '4px solid #d1d5db',
+                        borderTop: '4px solid #3b82f6',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                    }}></div>
+                    <span style={{fontSize: '18px', color: '#64748b'}}>
+                        Chargement de l'application...
+                    </span>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">
-                        Maintenance App - Test
-                    </h1>
-                    <p className="mt-2 text-gray-600">
-                        Gestion des équipements ({equipements.length} équipements)
-                    </p>
-                </div>
+        <>
+            {user ? (
+                <RoleBasedRouter user={user} onLogout={() => setUser(null)} />
+            ) : (
+                <LoginForm onLogin={setUser} />
+            )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Liste des équipements */}
-                    <div className="lg:col-span-2">
-                        <div className="bg-white shadow rounded-lg">
-                            <div className="px-6 py-4 border-b border-gray-200">
-                                <h2 className="text-lg font-medium text-gray-900">
-                                    Liste des équipements
-                                </h2>
-                            </div>
-                            <div className="divide-y divide-gray-200">
-                                {equipements.map((equipement) => (
-                                    <div
-                                        key={equipement.id}
-                                        className="p-6 hover:bg-gray-50 cursor-pointer transition-colors duration-200"
-                                        onClick={() => showEquipementDetails(equipement.id)}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex-1">
-                                                <h3 className="text-lg font-medium text-gray-900 mb-1">
-                                                    {equipement.name}
-                                                </h3>
-                                                <p className="text-sm text-gray-600 mb-2">
-                                                    Code: {equipement.code}
-                                                </p>
-                                                <p className="text-sm text-gray-500 mb-2">
-                                                    📍 {equipement.location}
-                                                </p>
-                                                {equipement.type_equipement && (
-                                                    <p className="text-sm text-blue-600">
-                                                        Type: {equipement.type_equipement.name}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div className="flex flex-col items-end">
-                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(equipement.status)}`}>
-                                                    {getStatusText(equipement.status)}
-                                                </span>
-                                                <span className="text-xs text-gray-400 mt-2">
-                                                    Cliquer pour détails
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+            {/* Global Styles */}
+            <style>
+                {`
+                    * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }
 
-                    {/* Détails de l'équipement sélectionné */}
-                    <div className="lg:col-span-1">
-                        <div className="bg-white shadow rounded-lg">
-                            <div className="px-6 py-4 border-b border-gray-200">
-                                <h2 className="text-lg font-medium text-gray-900">
-                                    Détails de l'équipement
-                                </h2>
-                            </div>
-                            <div className="p-6">
-                                {selectedEquipement ? (
-                                    <div className="space-y-4">
-                                        <div>
-                                            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                                                {selectedEquipement.name}
-                                            </h3>
-                                            <p className="text-gray-600">
-                                                {selectedEquipement.description}
-                                            </p>
-                                        </div>
+                    body {
+                        font-family: system-ui, -apple-system, sans-serif;
+                        background-color: #f8fafc;
+                    }
 
-                                        <div className="border-t pt-4">
-                                            <dl className="space-y-2">
-                                                <div>
-                                                    <dt className="text-sm font-medium text-gray-500">Code</dt>
-                                                    <dd className="text-sm text-gray-900">{selectedEquipement.code}</dd>
-                                                </div>
-                                                <div>
-                                                    <dt className="text-sm font-medium text-gray-500">Localisation</dt>
-                                                    <dd className="text-sm text-gray-900">{selectedEquipement.location}</dd>
-                                                </div>
-                                                <div>
-                                                    <dt className="text-sm font-medium text-gray-500">Type</dt>
-                                                    <dd className="text-sm text-gray-900">
-                                                        {selectedEquipement.type_equipement?.name || 'Non défini'}
-                                                    </dd>
-                                                </div>
-                                                <div>
-                                                    <dt className="text-sm font-medium text-gray-500">Date d'installation</dt>
-                                                    <dd className="text-sm text-gray-900">
-                                                        {selectedEquipement.date_installation || 'Non définie'}
-                                                    </dd>
-                                                </div>
-                                                <div>
-                                                    <dt className="text-sm font-medium text-gray-500">Statut</dt>
-                                                    <dd>
-                                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedEquipement.status)}`}>
-                                                            {getStatusText(selectedEquipement.status)}
-                                                        </span>
-                                                    </dd>
-                                                </div>
-                                            </dl>
-                                        </div>
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
 
-                                        {/* Statistiques */}
-                                        <div className="border-t pt-4">
-                                            <h4 className="text-sm font-medium text-gray-500 mb-2">Statistiques</h4>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="text-center p-2 bg-blue-50 rounded">
-                                                    <div className="text-lg font-semibold text-blue-600">
-                                                        {selectedEquipement.tickets?.length || 0}
-                                                    </div>
-                                                    <div className="text-xs text-blue-500">Tickets</div>
-                                                </div>
-                                                <div className="text-center p-2 bg-red-50 rounded">
-                                                    <div className="text-lg font-semibold text-red-600">
-                                                        {selectedEquipement.pannes?.length || 0}
-                                                    </div>
-                                                    <div className="text-xs text-red-500">Pannes</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-gray-500 text-center py-8">
-                                        Sélectionnez un équipement pour voir les détails
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                    @keyframes fadeIn {
+                        0% { opacity: 0; transform: translateY(10px); }
+                        100% { opacity: 1; transform: translateY(0); }
+                    }
+
+                    input:focus {
+                        outline: none;
+                    }
+
+                    button:focus {
+                        outline: none;
+                    }
+                `}
+            </style>
+        </>
     );
 };
 
-// Montage de l'application
-const container = document.getElementById('app');
-const root = createRoot(container);
-root.render(<App />);
+export default MaintenanceApp;

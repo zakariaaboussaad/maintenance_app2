@@ -2,38 +2,38 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
-    protected $primaryKey = 'id_user';
+    protected $table = 'users';
+    protected $primaryKey = 'id_user'; // ✅ Your primary key
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     /**
      * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
      */
     protected $fillable = [
-        'nom',
         'prenom',
-        'matricule',
+        'nom',
         'email',
         'password',
+        'role_id',
+        'matricule',
         'numero_telephone',
         'poste_affecte',
-        'role_id',
         'is_active',
         'date_embauche',
     ];
 
     /**
      * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
      */
     protected $hidden = [
         'password',
@@ -41,70 +41,74 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * The attributes that should be cast.
      */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'date_embauche' => 'date',
-            'is_active' => 'boolean',
-        ];
-    }
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'date_embauche' => 'date',
+        'is_active' => 'boolean',
+        'role_id' => 'integer',
+    ];
 
     /**
      * Get the user's full name.
      */
-    public function getFullNameAttribute(): string
+    public function getFullNameAttribute()
     {
-        return "{$this->prenom} {$this->nom}";
+        return trim(($this->prenom ?? '') . ' ' . ($this->nom ?? ''));
     }
 
     /**
-     * Relationship with Role
+     * Get the name attribute (for Laravel Auth compatibility)
      */
-    public function role()
+    public function getNameAttribute()
     {
-        return $this->belongsTo(Role::class, 'role_id', 'id_role');
+        return $this->getFullNameAttribute();
     }
 
     /**
-     * Relationship with Equipements (assigned equipment)
+     * Vérifier si l'utilisateur est admin
      */
-    public function equipements()
+    public function isAdmin()
     {
-        return $this->hasMany(Equipement::class, 'utilisateur_assigne', 'id_user');
+        return $this->role_id === 1;
     }
 
     /**
-     * Relationship with Tickets
+     * Vérifier si l'utilisateur est technicien
      */
-    public function tickets()
+    public function isTechnician()
     {
-        return $this->hasMany(Ticket::class, 'demandeur_id', 'id_user');
+        return $this->role_id === 2;
     }
 
     /**
-     * Relationship with Interventions (as technician)
+     * Vérifier si l'utilisateur est utilisateur standard
      */
-    public function interventions()
+    public function isUser()
     {
-        return $this->hasMany(Intervention::class, 'technicien_id', 'id_user');
+        return $this->role_id === 3;
     }
 
     /**
-     * Relationship with Notifications
+     * Get the role name
      */
-    public function notifications()
+    public function getRoleNameAttribute()
     {
-        return $this->hasMany(Notification::class, 'user_id', 'id_user');
+        switch ($this->role_id) {
+            case 1:
+                return 'Administrateur';
+            case 2:
+                return 'Technicien';
+            case 3:
+                return 'Utilisateur';
+            default:
+                return 'Non défini';
+        }
     }
 
     /**
-     * Scope for active users
+     * Scope pour les utilisateurs actifs
      */
     public function scopeActive($query)
     {
@@ -112,12 +116,26 @@ class User extends Authenticatable
     }
 
     /**
-     * Scope for users by role
+     * Scope pour filtrer par rôle
      */
-    public function scopeByRole($query, $roleName)
+    public function scopeByRole($query, $roleId)
     {
-        return $query->whereHas('role', function ($q) use ($roleName) {
-            $q->where('nom_role', $roleName);
-        });
+        return $query->where('role_id', $roleId);
+    }
+
+    /**
+     * Relationship with tickets created by this user
+     */
+    public function tickets()
+    {
+        return $this->hasMany(Ticket::class, 'user_id', 'id_user');
+    }
+
+    /**
+     * Relationship with tickets assigned to this user as technician
+     */
+    public function assignedTickets()
+    {
+        return $this->hasMany(Ticket::class, 'technicien_assigne', 'id_user');
     }
 }

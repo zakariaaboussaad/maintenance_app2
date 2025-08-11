@@ -12,7 +12,7 @@
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
     <!-- Vite -->
-    @vite(['resources/css/app.css', 'resources/js/app.jsx'])
+    @vite(['resources/css/app.css', 'resources/js/main.jsx'])
 </head>
 <body class="font-sans antialiased bg-gray-50">
     <div id="app"></div>
