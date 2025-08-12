@@ -441,6 +441,12 @@ Route::middleware(['api'])->group(function () {
     // Notifications routes
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/{id}', [NotificationController::class, 'show']);
+
+    Route::get('/utilisateurs', [UsersController::class, 'index']);
+    Route::post('/utilisateurs', [UsersController::class, 'store']); // Créer un utilisateur
+    Route::get('/utilisateurs/{id}', [UsersController::class, 'show']);
+    Route::put('/utilisateurs/{id}', [UsersController::class, 'update']); // Modifier un utilisateur
+    Route::delete('/utilisateurs/{id}', [UsersController::class, 'destroy']); // Supprimer un utilisateur
 });
 
 // Dashboard stats

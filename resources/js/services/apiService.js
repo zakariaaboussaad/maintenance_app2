@@ -368,3 +368,43 @@ export const ticketService = {
         }
     }
 };
+
+// Users API functions
+export const userService = {
+    async getAllUsers() {
+        try {
+            const headers = {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            };
+
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/utilisateurs`, { headers });
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.success && Array.isArray(result.data)) {
+                return { success: true, data: result.data };
+            }
+            return { success: false, message: 'Format de réponse invalide' };
+        } catch (err) {
+            console.log("API non disponible pour les utilisateurs");
+            throw new Error("Impossible de récupérer les utilisateurs");
+        }
+    },
+
+    async getTechnicians() {
+        const all = await this.getAllUsers();
+        if (!all.success) return all;
+        const technicians = all.data.filter((u) => {
+            const roleName = (u.role?.nom_role || u.role?.nom || u.role?.name || '').toLowerCase();
+            return u.role_id === 2 || u.id_role === 2 || roleName.includes('tech');
+        });
+        return { success: true, data: technicians };
+    }
+};

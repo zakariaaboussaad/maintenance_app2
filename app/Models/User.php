@@ -91,6 +91,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Role relationship
+     */
+    public function role()
+    {
+        return $this->belongsTo(Role::class, 'role_id', 'id_role');
+    }
+
+    /**
      * Get the role name
      */
     public function getRoleNameAttribute()

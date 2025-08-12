@@ -66,6 +66,14 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
                 { id: 'equipements', label: 'Équipements', icon: Monitor },
                 { id: 'my-tickets', label: 'Vos Tickets', icon: Wrench }
             ];
+        } else if (userRole === 'admin') {
+            return [
+                { id: 'home', label: 'Dashboard', icon: Home },
+                { id: 'tickets', label: 'Tickets', icon: CheckCircle },
+                { id: 'my-tickets', label: 'Vos Tickets', icon: Wrench },
+                { id: 'users', label: 'Utilisateurs', icon: Users },
+                { id: 'equipements', label: 'Parc Informatique', icon: Monitor }
+            ];
         } else {
             return [
                 { id: 'home', label: 'Home', icon: Home },
