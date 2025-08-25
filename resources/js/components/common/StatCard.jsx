@@ -1,18 +1,19 @@
-// components/common/StatCard.jsx
 import React, { useState } from 'react';
 
-const StatCard = ({ title, value, Icon: IconComponent, bgColor, iconColor }) => {
+const StatCard = ({ title, value, Icon: IconComponent, bgColor, iconColor, darkTheme = false }) => {
     const [isHovered, setIsHovered] = useState(false);
 
     const cardStyle = {
-        backgroundColor: 'white',
+        backgroundColor: darkTheme ? '#1f2937' : 'white',
         borderRadius: '16px',
         padding: '28px',
-        boxShadow: isHovered ? '0 8px 25px rgba(0, 0, 0, 0.08)' : '0 4px 6px rgba(0, 0, 0, 0.05)',
+        boxShadow: isHovered
+            ? (darkTheme ? '0 8px 25px rgba(0, 0, 0, 0.3)' : '0 8px 25px rgba(0, 0, 0, 0.08)')
+            : (darkTheme ? '0 4px 6px rgba(0, 0, 0, 0.2)' : '0 4px 6px rgba(0, 0, 0, 0.05)'),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        border: '1px solid #f1f5f9',
+        border: `1px solid ${darkTheme ? '#374151' : '#f1f5f9'}`,
         transition: 'all 0.3s ease',
         transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
         cursor: 'pointer'
@@ -27,7 +28,7 @@ const StatCard = ({ title, value, Icon: IconComponent, bgColor, iconColor }) => 
             <div>
                 <h3 style={{
                     fontSize: '14px',
-                    color: '#64748b',
+                    color: darkTheme ? '#9ca3af' : '#64748b',
                     marginBottom: '12px',
                     fontWeight: '600',
                     textTransform: 'uppercase',
@@ -35,7 +36,11 @@ const StatCard = ({ title, value, Icon: IconComponent, bgColor, iconColor }) => 
                 }}>
                     {title}
                 </h3>
-                <div style={{fontSize: '36px', fontWeight: '800', color: '#1e293b'}}>
+                <div style={{
+                    fontSize: '36px',
+                    fontWeight: '800',
+                    color: darkTheme ? '#ffffff' : '#1e293b'
+                }}>
                     {value}
                 </div>
             </div>

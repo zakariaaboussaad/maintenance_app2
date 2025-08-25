@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Api\EquipementController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\PanneController;
@@ -11,6 +12,42 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\AuthController; // Fixed: Added Api namespace
 use App\Http\Controllers\Api\CategoryController; // Added CategoryController
+
+// Debug route for database connection testing
+Route::get('/debug/db', function () {
+    try {
+        // Test database connection
+        $connection = DB::connection()->getPdo();
+        $dbname = DB::connection()->getDatabaseName();
+
+        // Test tickets table
+        $tables = DB::select('SHOW TABLES');
+        $tables = array_map('current', (array) $tables);
+
+        $ticketColumns = [];
+        if (in_array('tickets', $tables)) {
+            $ticketColumns = DB::select('DESCRIBE tickets');
+        }
+
+        return response()->json([
+            'connection' => 'Successfully connected to the database',
+            'database' => $dbname,
+            'tables' => $tables,
+            'tickets_columns' => $ticketColumns,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'connection' => [
+                'driver' => config('database.default'),
+                'host' => config('database.connections.mysql.host'),
+                'port' => config('database.connections.mysql.port'),
+                'database' => config('database.connections.mysql.database'),
+                'username' => config('database.connections.mysql.username'),
+            ],
+        ], 500);
+    }
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -26,6 +63,179 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::get('/user', [AuthController::class, 'me']);
+
+    // Notifications routes (authenticated)
+    Route::get('/notifications', [NotificationController::class, 'getUserNotifications']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+    Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    
+    // Debug route for mark as read
+    Route::put('/notifications/{id}/read-debug', function($id) {
+        \Log::info('DEBUG: Mark as read route hit', ['id' => $id]);
+        return response()->json(['debug' => 'route hit', 'id' => $id]);
+    });
+    Route::get('/notifications/{id}', [NotificationController::class, 'show']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+    Route::delete('/notifications/clear-all', [NotificationController::class, 'clearAll']);
+    Route::post('/notifications/test', [NotificationController::class, 'sendTestNotification']);
+});
+
+// Test Sanctum token creation
+Route::get('/test-token', function () {
+    try {
+        $user = \App\Models\User::where('email', 'admin@maintenance.com')->first();
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+        
+        // Test token creation
+        $token = $user->createToken('test-token');
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Token created successfully',
+            'token' => substr($token->plainTextToken, 0, 20) . '...',
+            'user' => $user->email,
+            'user_id' => $user->id_user,
+            'token_id' => $token->accessToken->id
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ], 500);
+    }
+});
+
+// Test login with detailed logging
+Route::post('/test-login', function (\Illuminate\Http\Request $request) {
+    try {
+        $email = $request->input('email', 'admin@maintenance.com');
+        $password = $request->input('password', '123456');
+        
+        $user = \App\Models\User::where('email', $email)->first();
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+        
+        if (!\Illuminate\Support\Facades\Hash::check($password, $user->password)) {
+            return response()->json(['error' => 'Invalid password'], 401);
+        }
+        
+        $token = $user->createToken('login-test-token');
+        
+        return response()->json([
+            'success' => true,
+            'user' => [
+                'id' => $user->id_user,
+                'name' => trim(($user->prenom ?? '') . ' ' . ($user->nom ?? '')),
+                'email' => $user->email,
+                'role_id' => $user->role_id
+            ],
+            'token' => $token->plainTextToken,
+            'token_preview' => substr($token->plainTextToken, 0, 20) . '...'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
+// Test notification creation
+Route::get('/test-notification', function () {
+    try {
+        // Create a test notification for user ID 4 (Mohamed Mansouri)
+        $user = \App\Models\User::find(4);
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+        
+        $notification = \App\Models\Notification::create([
+            'titre' => 'Test Notification',
+            'message' => 'This is a test notification to verify the system is working',
+            'type' => 'system',
+            'user_id' => $user->id_user,
+            'lu' => false,
+            'date_creation' => now(),
+            'priorite' => 'normale'
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Test notification created',
+            'notification_id' => $notification->id_notification,
+            'user_id' => $user->id_user,
+            'user_email' => $user->email
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
+// Test notification service
+Route::get('/test-notification-service', function () {
+    try {
+        $user = \App\Models\User::find(4); // Mohamed Mansouri
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+        
+        $result = \App\Services\NotificationService::sendTestNotification($user);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'NotificationService test completed',
+            'notifications_created' => $result,
+            'user_email' => $user->email
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
+// Test authentication in API requests
+Route::middleware('auth:sanctum')->get('/test-auth', function (\Illuminate\Http\Request $request) {
+    try {
+        $authUser = auth()->user();
+        $sanctumUser = auth('sanctum')->user();
+        $requestUser = $request->user();
+        
+        return response()->json([
+            'success' => true,
+            'auth_user' => $authUser ? [
+                'id' => $authUser->id_user,
+                'email' => $authUser->email
+            ] : null,
+            'sanctum_user' => $sanctumUser ? [
+                'id' => $sanctumUser->id_user,
+                'email' => $sanctumUser->email
+            ] : null,
+            'request_user' => $requestUser ? [
+                'id' => $requestUser->id_user,
+                'email' => $requestUser->email
+            ] : null,
+            'token_present' => $request->bearerToken() ? 'yes' : 'no'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
 });
 
 // Test routes
@@ -359,6 +569,23 @@ Route::get('/create-user', function () {
             ]
         );
 
+        // Create the user that matches the login attempts
+        \App\Models\User::firstOrCreate(
+            ['email' => 'admin@maintenance.com'],
+            [
+                'nom' => 'Admin',
+                'prenom' => 'System',
+                'name' => 'System Admin',
+                'matricule' => 'SYS001',
+                'password' => Hash::make('123456'),
+                'numero_telephone' => '0600000001',
+                'poste_affecte' => 'Bureau Principal',
+                'role_id' => 1,
+                'is_active' => true,
+                'date_embauche' => now(),
+            ]
+        );
+
         // Also create simpler test users
         \App\Models\User::firstOrCreate(
             ['email' => 'admin@onee.com'],
@@ -392,6 +619,7 @@ Route::get('/create-user', function () {
             'message' => 'Users created successfully!',
             'test_accounts' => [
                 ['email' => 'admin@onee.ma', 'password' => 'password123', 'role' => 'Admin'],
+                ['email' => 'admin@maintenance.com', 'password' => '123456', 'role' => 'Admin'],
                 ['email' => 'admin@onee.com', 'password' => '123456', 'role' => 'Admin'],
                 ['email' => 'technicien@onee.com', 'password' => '123456', 'role' => 'Technicien'],
                 ['email' => 'user@onee.com', 'password' => '123456', 'role' => 'Utilisateur']
@@ -410,12 +638,18 @@ Route::get('/create-user', function () {
 Route::middleware(['api'])->group(function () {
     // Equipements routes
     Route::get('/equipements', [EquipementController::class, 'index']);
+    Route::post('/equipements', [EquipementController::class, 'store']); // Créer
     Route::get('/equipements/user/{userId}', [EquipementController::class, 'getUserEquipements']);
+    Route::get('/equipements/stats', [EquipementController::class, 'getStats']); // Statistiques
     Route::get('/equipements/{id}', [EquipementController::class, 'show']);
-
-    // Utilisateurs routes
-    Route::get('/utilisateurs', [UsersController::class, 'index']);
-    Route::get('/utilisateurs/{id}', [UsersController::class, 'show']);
+    Route::put('/equipements/{id}', [EquipementController::class, 'update']); // Modifier
+    Route::delete('/equipements/{id}', [EquipementController::class, 'destroy']); // Supprimer
+       // Utilisateurs routes
+       Route::get('/utilisateurs', [UsersController::class, 'index']);
+       Route::post('/utilisateurs', [UsersController::class, 'store']);
+       Route::get('/utilisateurs/{id}', [UsersController::class, 'show']);
+       Route::put('/utilisateurs/{id}', [UsersController::class, 'update']);
+       Route::delete('/utilisateurs/{id}', [UsersController::class, 'destroy']);
 
     // Pannes routes
     Route::get('/pannes', [PanneController::class, 'index']);
@@ -438,9 +672,6 @@ Route::middleware(['api'])->group(function () {
     Route::get('/interventions', [InterventionController::class, 'index']);
     Route::get('/interventions/{id}', [InterventionController::class, 'show']);
 
-    // Notifications routes
-    Route::get('/notifications', [NotificationController::class, 'index']);
-    Route::get('/notifications/{id}', [NotificationController::class, 'show']);
 
     Route::get('/utilisateurs', [UsersController::class, 'index']);
     Route::post('/utilisateurs', [UsersController::class, 'store']); // Créer un utilisateur
@@ -547,4 +778,50 @@ Route::get('/create-test-data', function () {
             'error' => $e->getMessage()
         ], 500);
     }
+});
+
+// Password request routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/password-requests', [App\Http\Controllers\Api\PasswordRequestController::class, 'createRequest']);
+    Route::get('/password-requests', [App\Http\Controllers\Api\PasswordRequestController::class, 'getRequests']);
+    Route::post('/password-requests/{id}/approve', [App\Http\Controllers\Api\PasswordRequestController::class, 'approveRequest']);
+    Route::post('/password-requests/{id}/reject', [App\Http\Controllers\Api\PasswordRequestController::class, 'rejectRequest']);
+
+    // History routes (Admin only)
+    Route::get('/history/users', [App\Http\Controllers\Api\HistoryController::class, 'getUsersHistory']);
+    Route::get('/history/users/{userId}/tickets', [App\Http\Controllers\Api\HistoryController::class, 'getUserTickets']);
+    Route::get('/history/equipments', [App\Http\Controllers\Api\HistoryController::class, 'getEquipmentsHistory']);
+    Route::get('/history/equipments/{equipmentId}/issues', [App\Http\Controllers\Api\HistoryController::class, 'getEquipmentIssues']);
+
+    // Excel Export routes (Admin only)
+    Route::post('/excel-export/equipment-full', [App\Http\Controllers\ExcelExportController::class, 'exportEquipmentFull']);
+    Route::post('/excel-export/equipment-only', [App\Http\Controllers\ExcelExportController::class, 'exportEquipmentOnly']);
+    Route::post('/excel-export/users', [App\Http\Controllers\ExcelExportController::class, 'exportUsers']);
+    Route::post('/excel-export/tickets', [App\Http\Controllers\ExcelExportController::class, 'exportTickets']);
+    Route::post('/excel-export/monthly-report', [App\Http\Controllers\ExcelExportController::class, 'exportMonthlyReport']);
+
+    // CSV Export routes (Admin only) - Temporary fallback
+    Route::post('/csv-export/equipment-full', [App\Http\Controllers\CsvExportController::class, 'exportEquipmentFull']);
+    Route::post('/csv-export/equipment-only', [App\Http\Controllers\CsvExportController::class, 'exportEquipmentOnly']);
+    Route::post('/csv-export/users', [App\Http\Controllers\CsvExportController::class, 'exportUsers']);
+    Route::post('/csv-export/tickets', [App\Http\Controllers\CsvExportController::class, 'exportTickets']);
+    Route::post('/csv-export/monthly-report', [App\Http\Controllers\CsvExportController::class, 'exportMonthlyReport']);
+
+    // Test routes for debugging
+    Route::get('/test-auth', [App\Http\Controllers\TestExportController::class, 'testAuth']);
+    Route::post('/test-export', [App\Http\Controllers\TestExportController::class, 'testSimpleExport']);
+    
+    // Simple working exports
+    Route::post('/simple-export/equipment', [App\Http\Controllers\SimpleExportController::class, 'exportEquipmentCsv']);
+    Route::post('/simple-export/users', [App\Http\Controllers\SimpleExportController::class, 'exportUsersCsv']);
+    
+    // Working exports (no auth for testing)
+    Route::post('/working-export/equipment', [App\Http\Controllers\WorkingExportController::class, 'exportEquipment']);
+    Route::post('/working-export/users', [App\Http\Controllers\WorkingExportController::class, 'exportUsers']);
+    Route::post('/working-export/tickets', [App\Http\Controllers\WorkingExportController::class, 'exportTickets']);
+    
+    // Ultra simple test exports
+    Route::post('/ultra-simple/equipment', [App\Http\Controllers\UltraSimpleExportController::class, 'exportEquipment']);
+    Route::post('/ultra-simple/users', [App\Http\Controllers\UltraSimpleExportController::class, 'exportUsers']);
+    Route::post('/ultra-simple/tickets', [App\Http\Controllers\UltraSimpleExportController::class, 'exportTickets']);
 });

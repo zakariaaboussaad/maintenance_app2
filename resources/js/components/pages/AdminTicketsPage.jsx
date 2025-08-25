@@ -91,15 +91,15 @@ const AdminTicketsPage = ({ user }) => {
   };
 
   const getStatusBadge = (status) => {
-    const map = {
-      resolu: { bg: '#d1fae5', color: '#065f46', text: 'Résolu' },
-      ferme: { bg: '#e5e7eb', color: '#374151', text: 'Fermé' },
-      en_cours: { bg: '#e0e7ff', color: '#3730a3', text: 'En cours' },
+    const statusMap = {
       en_attente: { bg: '#fef3c7', color: '#92400e', text: 'En attente' },
+      en_cours: { bg: '#dbeafe', color: '#1e40af', text: 'En cours' },
+      resolu: { bg: '#d1fae5', color: '#065f46', text: 'Résolu' },
+      ferme: { bg: '#f3f4f6', color: '#6b7280', text: 'Fermé' },
       ouvert: { bg: '#fee2e2', color: '#991b1b', text: 'Ouvert' },
       annule: { bg: '#f3f4f6', color: '#6b7280', text: 'Annulé' },
     };
-    const s = map[status] || { bg: '#f3f4f6', color: '#374151', text: status };
+    const s = statusMap[status] || { bg: '#f3f4f6', color: '#374151', text: status };
     return (
       <div style={{
         padding: '4px 12px',
@@ -344,15 +344,66 @@ const AdminTicketsPage = ({ user }) => {
               <div>{getStatusBadge(ticket.status)}</div>
               <div>{getPriorityBadge(ticket.priorite)}</div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button title="Voir les détails" onClick={() => { setSelectedTicket(ticket); setDetailsOpen(true); }} style={{ padding: 8, width: 32, height: 32, background: '#111827', color: 'white', border: 0, borderRadius: 6, display: 'grid', placeItems: 'center' }}>
-                  <Eye size={16} />
-                </button>
-                <button title="Affecter" onClick={() => openAssignDialog(ticket)} style={{ padding: 8, width: 32, height: 32, background: '#111827', color: 'white', border: 0, borderRadius: 6, display: 'grid', placeItems: 'center' }}>
-                  <UserPlus size={16} />
-                </button>
-                <button title="Prendre en charge" onClick={() => handleTakeTicket(ticket)} style={{ padding: 8, width: 32, height: 32, background: '#111827', color: 'white', border: 0, borderRadius: 6, display: 'grid', placeItems: 'center' }}>
-                  <Hand size={16} />
-                </button>
+              <button
+  title="Voir les détails"
+  onClick={() => { setSelectedTicket(ticket); setDetailsOpen(true); }}
+  onMouseEnter={(e) => { e.target.style.background = '#3b82f6'; }}
+  onMouseLeave={(e) => { e.target.style.background = '#111827'; }}
+  style={{
+    padding: 8,
+    width: 32,
+    height: 32,
+    background: '#111827', // stays black by default
+    color: 'white',
+    border: 0,
+    borderRadius: 6,
+    display: 'grid',
+    placeItems: 'center'
+  }}
+>
+  <Eye size={16} />
+</button>
+
+<button
+  title="Affecter"
+  onClick={() => openAssignDialog(ticket)}
+  onMouseEnter={(e) => { e.target.style.background = '#22c55e'; }}
+  onMouseLeave={(e) => { e.target.style.background = '#111827'; }}
+  style={{
+    padding: 8,
+    width: 32,
+    height: 32,
+    background: '#111827',
+    color: 'white',
+    border: 0,
+    borderRadius: 6,
+    display: 'grid',
+    placeItems: 'center'
+  }}
+>
+  <UserPlus size={16} />
+</button>
+
+<button
+  title="Prendre en charge"
+  onClick={() => handleTakeTicket(ticket)}
+  onMouseEnter={(e) => { e.target.style.background = '#8b5cf6'; }}
+  onMouseLeave={(e) => { e.target.style.background = '#111827'; }}
+  style={{
+    padding: 8,
+    width: 32,
+    height: 32,
+    background: '#111827',
+    color: 'white',
+    border: 0,
+    borderRadius: 6,
+    display: 'grid',
+    placeItems: 'center'
+  }}
+>
+  <Hand size={16} />
+</button>
+
               </div>
             </div>
           ))}

@@ -7,6 +7,7 @@ import Sidebar from '../common/Sidebar';
 import Header from '../common/Header';
 import StatCard from '../common/StatCard';
 import TicketsPage from '../pages/TicketsPage';
+import UserSettingsPage from '../pages/UserSettingsPage';
 
 const UserDashboard = ({ onLogout, user }) => {
     const [equipements, setEquipements] = useState([]);
@@ -405,10 +406,7 @@ const UserDashboard = ({ onLogout, user }) => {
                         )}
 
                         {activeMenuItem === 'settings' && (
-                            <div style={{textAlign: 'center', padding: '60px'}}>
-                                <h2 style={{fontSize: '24px', color: '#6b7280'}}>Page Paramètres</h2>
-                                <p style={{color: '#9ca3af', marginTop: '16px'}}>Cette section est en cours de développement</p>
-                            </div>
+                            <UserSettingsPage user={user} />
                         )}
                     </main>
                 </div>

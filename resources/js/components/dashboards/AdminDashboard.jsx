@@ -1,60 +1,98 @@
-// components/dashboards/AdminDashboard.jsx
-import React, { useState } from 'react';
-import { Home, Users, ClipboardList, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../common/Sidebar';
 import Header from '../common/Header';
+import AdminDashboardPage from '../pages/AdminDashboardPage';
 import AdminTicketsPage from '../pages/AdminTicketsPage';
 import AdminUsersPage from '../pages/AdminUsersPage';
 import AdminEquipmentsPage from '../pages/AdminEquipmentsPage';
 import TechnicianMyTicketsPage from '../pages/TechnicianMyTicketsPage';
+import AdminSettingsPage from '../pages/AdminSettingsPage';
+import UserHistoryPage from '../pages/UserHistoryPage';
+import EquipmentHistoryPage from '../pages/EquipmentHistoryPage';
+import ExcelReportsPage from '../pages/ExcelReportsPage';
+import AdminPasswordRequestsPage from '../pages/AdminPasswordRequestsPage';
 
 const AdminDashboard = ({ onLogout, user }) => {
-    const [activeMenuItem, setActiveMenuItem] = useState('tickets');
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeMenuItem, setActiveMenuItem] = useState('home');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [darkTheme, setDarkTheme] = useState(false);
 
-    return (
-        <div style={{minHeight: '100vh', backgroundColor: '#f8fafc'}}>
-            <div style={{display: 'flex'}}>
-                <Sidebar
-                    activeMenuItem={activeMenuItem}
-                    setActiveMenuItem={setActiveMenuItem}
-                    sidebarCollapsed={sidebarCollapsed}
-                    setSidebarCollapsed={setSidebarCollapsed}
-                    onLogout={onLogout}
-                    userRole="admin"
-                />
+  // Load theme preference from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      setDarkTheme(savedTheme === 'dark');
+    }
+  }, []);
 
-                <div style={{flex: '1', display: 'flex', flexDirection: 'column'}}>
-                    <Header user={user} />
+  // Apply theme to document body
+  useEffect(() => {
+    document.body.style.backgroundColor = darkTheme ? '#111827' : '#f8fafc';
+    document.body.style.color = darkTheme ? '#ffffff' : '#000000';
+    return () => {
+      document.body.style.backgroundColor = '';
+      document.body.style.color = '';
+    };
+  }, [darkTheme]);
 
-                    <main style={{padding: '40px', flex: 1}}>
-                        {activeMenuItem === 'home' && (
-                            <div style={{backgroundColor: 'white', borderRadius: 20, padding: 40, boxShadow: '0 4px 6px rgba(0,0,0,0.05)'}}>
-                                <h1 style={{fontSize: 28, fontWeight: 800, margin: 0}}>Panneau d'administration</h1>
-                                <p style={{color: '#64748b'}}>Bienvenue {user?.name || `${user?.prenom} ${user?.nom}`}</p>
-                            </div>
-                        )}
+  const renderPageContent = () => {
+    switch (activeMenuItem) {
+      case 'home':
+        return <AdminDashboardPage user={user} darkTheme={darkTheme} />;
+      case 'tickets':
+        return <AdminTicketsPage user={user} darkTheme={darkTheme} />;
+      case 'my-tickets':
+        return <TechnicianMyTicketsPage user={user} darkTheme={darkTheme} />;
+      case 'users':
+        return <AdminUsersPage darkTheme={darkTheme} />;
+      case 'equipements':
+        return <AdminEquipmentsPage darkTheme={darkTheme} />;
+      case 'user-history':
+        return <UserHistoryPage darkTheme={darkTheme} />;
+      case 'equipment-history':
+        return <EquipmentHistoryPage darkTheme={darkTheme} />;
+      case 'excel-reports':
+        return <ExcelReportsPage darkTheme={darkTheme} />;
+      case 'settings':
+        return <AdminSettingsPage user={user} darkTheme={darkTheme} setDarkTheme={setDarkTheme} />;
+      default:
+        return <AdminDashboardPage user={user} darkTheme={darkTheme} />;
+    }
+  };
 
-                        {activeMenuItem === 'tickets' && (
-                            <AdminTicketsPage user={user} />
-                        )}
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: darkTheme ? '#111827' : '#f8fafc',
+      transition: 'background-color 0.3s ease'
+    }}>
+      <div style={{display: 'flex'}}>
+        <Sidebar
+          activeMenuItem={activeMenuItem}
+          setActiveMenuItem={setActiveMenuItem}
+          sidebarCollapsed={sidebarCollapsed}
+          setSidebarCollapsed={setSidebarCollapsed}
+          onLogout={onLogout}
+          userRole="admin"
+          darkTheme={darkTheme}
+        />
 
-                        {activeMenuItem === 'my-tickets' && (
-                            <TechnicianMyTicketsPage user={user} />
-                        )}
+        <div style={{flex: '1', display: 'flex', flexDirection: 'column'}}>
+          <Header user={user} darkTheme={darkTheme} />
 
-                        {activeMenuItem === 'users' && (
-                            <AdminUsersPage />
-                        )}
-
-                        {activeMenuItem === 'equipements' && (
-                            <AdminEquipmentsPage />
-                        )}
-                    </main>
-                </div>
-            </div>
+          <main style={{
+            padding: '40px',
+            flex: 1,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            minHeight: 'calc(100vh - 80px)',
+            overflow: 'auto'
+          }}>
+            {renderPageContent()}
+          </main>
         </div>
-    );
+      </div>
+    </div>
+  );
 };
 
 export default AdminDashboard;

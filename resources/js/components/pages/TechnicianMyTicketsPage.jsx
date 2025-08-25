@@ -127,11 +127,11 @@ const TechnicianMyTicketsPage = ({ user }) => {
 
     const getStatusBadge = (status) => {
         const statusStyles = {
-            'resolu': { backgroundColor: '#d1fae5', color: '#065f46', text: 'Résolu' },
-            'ferme': { backgroundColor: '#e5e7eb', color: '#374151', text: 'Fermé' },
-            'en_cours': { backgroundColor: '#e0e7ff', color: '#3730a3', text: 'En cours' },
-            'en_attente': { backgroundColor: '#fef3c7', color: '#92400e', text: 'En attente' },
             'ouvert': { backgroundColor: '#fee2e2', color: '#991b1b', text: 'Ouvert' },
+            'en_attente': { backgroundColor: '#fef3c7', color: '#92400e', text: 'En Attente' },
+            'en_cours': { backgroundColor: '#dbeafe', color: '#1e40af', text: 'En Cours' },
+            'resolu': { backgroundColor: '#d1fae5', color: '#065f46', text: 'Résolu' },
+            'ferme': { backgroundColor: '#f3f4f6', color: '#6b7280', text: 'Fermé' },
             'annule': { backgroundColor: '#f3f4f6', color: '#6b7280', text: 'Annulé' }
         };
 
@@ -465,55 +465,61 @@ const TechnicianMyTicketsPage = ({ user }) => {
                                     gap: '8px',
                                     alignItems: 'center'
                                 }}>
-                                    <button
-                                        style={{
-                                            padding: '8px',
-                                            backgroundColor: '#000000',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            width: '32px',
-                                            height: '32px'
-                                        }}
-                                        title="Voir les détails"
-                                        onClick={() => {
-                                            setSelectedTicket(ticket);
-                                            setShowDetailsModal(true);
-                                        }}
-                                    >
-                                        <Eye size={16} />
-                                    </button>
-                                    <button
-                                        style={{
-                                            padding: '8px',
-                                            backgroundColor: '#000000',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            width: '32px',
-                                            height: '32px'
-                                        }}
-                                        title="Modifier le ticket"
-                                        onClick={() => {
-                                            setSelectedTicket(ticket);
-                                            setEditForm({
-                                                status: ticket.status || 'ouvert',
-                                                priorite: ticket.priorite || 'normale',
-                                                commentaire_resolution: ticket.commentaire_resolution || ''
-                                            });
-                                            setShowEditModal(true);
-                                        }}
-                                    >
-                                        <Edit size={16} />
-                                    </button>
+                                   <button
+  style={{
+    padding: '8px',
+    backgroundColor: '#000000', // black by default
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px'
+  }}
+  title="Voir les détails"
+  onMouseEnter={(e) => { e.target.style.backgroundColor = '#3b82f6'; }}
+  onMouseLeave={(e) => { e.target.style.backgroundColor = '#000000'; }}
+  onClick={() => {
+    setSelectedTicket(ticket);
+    setShowDetailsModal(true);
+  }}
+>
+  <Eye size={16} />
+</button>
+
+<button
+  style={{
+    padding: '8px',
+    backgroundColor: '#000000', // black by default
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px'
+  }}
+  title="Modifier le ticket"
+  onMouseEnter={(e) => { e.target.style.backgroundColor = '#f59e0b'; }}
+  onMouseLeave={(e) => { e.target.style.backgroundColor = '#000000'; }}
+  onClick={() => {
+    setSelectedTicket(ticket);
+    setEditForm({
+      status: ticket.status || 'ouvert',
+      priorite: ticket.priorite || 'normale',
+      commentaire_resolution: ticket.commentaire_resolution || ''
+    });
+    setShowEditModal(true);
+  }}
+>
+  <Edit size={16} />
+</button>
+
 
                                 </div>
                             </div>

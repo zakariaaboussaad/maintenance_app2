@@ -121,22 +121,36 @@ class UsersController extends Controller
     public function update(Request $request, $id)
     {
         try {
+            // Debug: Log des données reçues
+            \Log::info('Update user request:', [
+                'id' => $id,
+                'data' => $request->all()
+            ]);
+
             $user = User::findOrFail($id);
 
-            // Validation des données
-            $validator = Validator::make($request->all(), [
+            // Validation des données pour la mise à jour
+            $rules = [
                 'prenom' => 'sometimes|required|string|max:255',
                 'nom' => 'sometimes|required|string|max:255',
-                'email' => 'sometimes|required|email|unique:users,email,' . $id,
+                'email' => 'sometimes|required|email|unique:users,email,' . $id . ',id_user',
                 'password' => 'nullable|string|min:6',
-                'matricule' => 'nullable|string|max:255|unique:users,matricule,' . $id,
+                'matricule' => 'nullable|string|max:255|unique:users,matricule,' . $id . ',id_user',
                 'numero_telephone' => 'nullable|string|max:20',
                 'poste_affecte' => 'nullable|string|max:255',
                 'role_id' => 'sometimes|required|integer|in:1,2,3',
                 'gender' => 'sometimes|required|in:male,female'
-            ]);
+            ];
+
+            // Si l'email est vide, on le retire de la validation
+            if (empty($request->email)) {
+                unset($rules['email']);
+            }
+
+            $validator = Validator::make($request->all(), $rules);
 
             if ($validator->fails()) {
+                \Log::error('Validation failed:', $validator->errors()->toArray());
                 return response()->json([
                     'success' => false,
                     'message' => 'Données invalides',
@@ -144,26 +158,60 @@ class UsersController extends Controller
                 ], 422);
             }
 
-            // Mettre à jour les champs
-            if ($request->has('prenom')) $user->prenom = $request->prenom;
-            if ($request->has('nom')) $user->nom = $request->nom;
-            if ($request->has('prenom') || $request->has('nom')) {
-                $user->name = ($request->prenom ?? $user->prenom) . ' ' . ($request->nom ?? $user->nom);
-            }
-            if ($request->has('email')) $user->email = $request->email;
-            if ($request->has('password') && $request->password !== '************') {
-                $user->password = Hash::make($request->password);
-            }
-            if ($request->has('matricule')) $user->matricule = $request->matricule;
-            if ($request->has('numero_telephone')) $user->numero_telephone = $request->numero_telephone;
-            if ($request->has('poste_affecte')) $user->poste_affecte = $request->poste_affecte;
-            if ($request->has('role_id')) $user->role_id = $request->role_id;
-            if ($request->has('gender')) $user->gender = $request->gender;
+            // Mettre à jour les champs un par un
+            $updateData = [];
 
-            $user->save();
+            if ($request->has('prenom') && !empty($request->prenom)) {
+                $updateData['prenom'] = $request->prenom;
+            }
+
+            if ($request->has('nom') && !empty($request->nom)) {
+                $updateData['nom'] = $request->nom;
+            }
+
+            // Mettre à jour le champ 'name' si prenom ou nom change
+            if (isset($updateData['prenom']) || isset($updateData['nom'])) {
+                $newPrenom = $updateData['prenom'] ?? $user->prenom;
+                $newNom = $updateData['nom'] ?? $user->nom;
+                $updateData['name'] = trim($newPrenom . ' ' . $newNom);
+            }
+
+            if ($request->has('email') && !empty($request->email)) {
+                $updateData['email'] = $request->email;
+            }
+
+            // Gestion spéciale du mot de passe
+            if ($request->has('password') && !empty($request->password) && $request->password !== '************') {
+                $updateData['password'] = Hash::make($request->password);
+            }
+
+            if ($request->has('matricule')) {
+                $updateData['matricule'] = $request->matricule;
+            }
+
+            if ($request->has('numero_telephone')) {
+                $updateData['numero_telephone'] = $request->numero_telephone;
+            }
+
+            if ($request->has('poste_affecte')) {
+                $updateData['poste_affecte'] = $request->poste_affecte;
+            }
+
+            if ($request->has('role_id') && !empty($request->role_id)) {
+                $updateData['role_id'] = intval($request->role_id);
+            }
+
+            if ($request->has('gender') && !empty($request->gender)) {
+                $updateData['gender'] = $request->gender;
+            }
+
+            \Log::info('Update data:', $updateData);
+
+            // Effectuer la mise à jour
+            $user->update($updateData);
 
             // Recharger avec les relations
-            $user->load('role');
+            $user->fresh(['role']);
 
             return response()->json([
                 'success' => true,
@@ -171,7 +219,40 @@ class UsersController extends Controller
                 'data' => $user
             ]);
 
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Utilisateur non trouvé',
+                'error' => 'L\'utilisateur avec l\'ID ' . $id . ' n\'existe pas'
+            ], 404);
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Log::error('Database error:', ['error' => $e->getMessage()]);
+
+            // Gérer les erreurs de contrainte de base de données
+            if (str_contains($e->getMessage(), 'Duplicate entry')) {
+                if (str_contains($e->getMessage(), 'email')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cette adresse email est déjà utilisée',
+                        'errors' => ['email' => ['Cette adresse email est déjà utilisée']]
+                    ], 422);
+                } elseif (str_contains($e->getMessage(), 'matricule')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Ce matricule est déjà utilisé',
+                        'errors' => ['matricule' => ['Ce matricule est déjà utilisé']]
+                    ], 422);
+                }
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de base de données lors de la mise à jour',
+                'error' => 'Erreur de contrainte de base de données'
+            ], 500);
         } catch (\Exception $e) {
+            \Log::error('General error:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la mise à jour de l\'utilisateur',

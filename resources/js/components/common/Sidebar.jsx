@@ -1,8 +1,15 @@
-// components/common/Sidebar.jsx
 import React from 'react';
-import { Home, Users, Settings, LogOut, Wrench, CheckCircle, Monitor } from 'lucide-react';
+import { Home, Users, Settings, LogOut, Wrench, CheckCircle, Monitor, Bell, History, User, Computer, FileSpreadsheet, Key } from 'lucide-react';
 
-const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSidebarCollapsed, onLogout, userRole = 'user' }) => {
+const Sidebar = ({
+    activeMenuItem,
+    setActiveMenuItem,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    onLogout,
+    userRole = 'user',
+    darkTheme = false
+}) => {
     const getNavItemStyle = (itemName) => {
         const isActive = activeMenuItem === itemName;
 
@@ -26,7 +33,7 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
                 alignItems: 'center',
                 padding: '0 24px',
                 height: '50px',
-                color: isActive ? '#ffffff' : '#6b7280',
+                color: isActive ? '#ffffff' : (darkTheme ? '#d1d5db' : '#6b7280'),
                 textDecoration: 'none',
                 transition: 'all 0.2s ease',
                 cursor: 'pointer',
@@ -59,6 +66,7 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
     };
 
     const getMenuItems = () => {
+        console.log('Getting menu items for userRole:', userRole);
         if (userRole === 'technician') {
             return [
                 { id: 'home', label: 'Home', icon: Home },
@@ -72,7 +80,11 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
                 { id: 'tickets', label: 'Tickets', icon: CheckCircle },
                 { id: 'my-tickets', label: 'Vos Tickets', icon: Wrench },
                 { id: 'users', label: 'Utilisateurs', icon: Users },
-                { id: 'equipements', label: 'Parc Informatique', icon: Monitor }
+                { id: 'equipements', label: 'Parc Informatique', icon: Monitor },
+                { id: 'user-history', label: 'Historique Utilisateur', icon: User },
+                { id: 'equipment-history', label: 'Historique Équipement', icon: Computer },
+                { id: 'excel-reports', label: 'Rapports Excel', icon: FileSpreadsheet },
+                
             ];
         } else {
             return [
@@ -87,15 +99,15 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
     return (
         <nav style={{
             width: sidebarCollapsed ? '80px' : '240px',
-            backgroundColor: '#ffffff',
+            backgroundColor: darkTheme ? '#1f2937' : '#ffffff',
             padding: '0',
-            height: '100vh',
+            minHeight: '100vh',
             fontFamily: 'system-ui, -apple-system, sans-serif',
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            transition: 'width 0.3s ease',
-            borderRight: '1px solid #e2e8f0',
+            transition: 'all 0.3s ease',
+            borderRight: `1px solid ${darkTheme ? '#374151' : '#e2e8f0'}`,
             overflow: 'hidden'
         }}>
             {/* Logo Section */}
@@ -117,11 +129,11 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
                             letterSpacing: '-0.025em'
                         }}>
                             <span style={{color: '#4880FF'}}>ONEE</span>
-                            <span style={{color: '#202224'}}>-BE</span>
+                            <span style={{color: darkTheme ? '#ffffff' : '#202224'}}>-BE</span>
                         </div>
                         <div style={{
                             fontSize: '12px',
-                            color: '#64748b',
+                            color: darkTheme ? '#9ca3af' : '#64748b',
                             textAlign: 'center',
                             marginTop: '4px'
                         }}>
@@ -147,7 +159,7 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
             </div>
 
             {/* Top Navigation Items */}
-            <div style={{flex: '1', paddingTop: sidebarCollapsed ? '8px' : '0'}}>
+            <div style={{flexGrow: 1, paddingTop: sidebarCollapsed ? '8px' : '0'}}>
                 {menuItems.map((item) => {
                     const IconComponent = item.icon;
                     return (
@@ -160,7 +172,7 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
                             >
                                 <IconComponent
                                     size={20}
-                                    style={{color: activeMenuItem === item.id ? (sidebarCollapsed ? '#4880FF' : '#ffffff') : '#6b7280'}}
+                                    style={{color: activeMenuItem === item.id ? (sidebarCollapsed ? '#4880FF' : '#ffffff') : (darkTheme ? '#d1d5db' : '#6b7280')}}
                                 />
                                 {!sidebarCollapsed && <span style={{marginLeft: '14px'}}>{item.label}</span>}
                             </div>
@@ -170,7 +182,7 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
             </div>
 
             {/* Bottom Navigation */}
-            <div style={{paddingBottom: '24px'}}>
+            <div style={{marginTop: 'auto', paddingBottom: '24px'}}>
                 <div style={{position: 'relative', marginBottom: sidebarCollapsed ? '8px' : '0'}}>
                     {getActiveIndicator('settings')}
                     <div
@@ -180,7 +192,7 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
                     >
                         <Settings
                             size={20}
-                            style={{color: activeMenuItem === 'settings' ? (sidebarCollapsed ? '#4880FF' : '#ffffff') : '#6b7280'}}
+                            style={{color: activeMenuItem === 'settings' ? (sidebarCollapsed ? '#4880FF' : '#ffffff') : (darkTheme ? '#d1d5db' : '#6b7280')}}
                         />
                         {!sidebarCollapsed && <span style={{marginLeft: '14px'}}>Settings</span>}
                     </div>
@@ -190,27 +202,24 @@ const Sidebar = ({ activeMenuItem, setActiveMenuItem, sidebarCollapsed, setSideb
                     <div
                         style={{
                             ...getNavItemStyle('logout'),
-                            color: '#6b7280',
+                            color: darkTheme ? '#d1d5db' : '#6b7280',
                         }}
                         onClick={onLogout}
                         title={sidebarCollapsed ? 'Logout' : ''}
                         onMouseEnter={(e) => {
                             if (!sidebarCollapsed) {
-                                e.currentTarget.style.backgroundColor = '#fef2f2';
+                                e.currentTarget.style.backgroundColor = darkTheme ? '#374151' : '#fef2f2';
                                 e.currentTarget.style.color = '#dc2626';
                             }
                         }}
                         onMouseLeave={(e) => {
                             if (!sidebarCollapsed) {
                                 e.currentTarget.style.backgroundColor = 'transparent';
-                                e.currentTarget.style.color = '#6b7280';
+                                e.currentTarget.style.color = darkTheme ? '#d1d5db' : '#6b7280';
                             }
                         }}
                     >
-                        <LogOut
-                            size={20}
-                            style={{color: 'inherit'}}
-                        />
+                        <LogOut size={20} style={{color: 'inherit'}} />
                         {!sidebarCollapsed && <span style={{marginLeft: '14px'}}>Logout</span>}
                     </div>
                 </div>

@@ -10,7 +10,17 @@ class Notification extends Model
 {
     use HasFactory;
 
-    protected $primaryKey = 'id_notification';
+    protected $primaryKey = 'id';
+    
+    /**
+     * The name of the "created at" column.
+     */
+    const CREATED_AT = 'created_at';
+    
+    /**
+     * The name of the "updated at" column.
+     */
+    const UPDATED_AT = 'updated_at';
 
     /**
      * The attributes that are mass assignable.
@@ -20,11 +30,15 @@ class Notification extends Model
     protected $fillable = [
         'titre',
         'message',
-        'type_notification',
-        'date_envoi',
-        'is_read',
-        'data',
+        'type',
+        'date_creation',
+        'lu',
         'user_id',
+        'ticket_id',
+        'panne_id',
+        'equipement_id',
+        'priorite',
+        'data'
     ];
 
     /**
@@ -35,8 +49,8 @@ class Notification extends Model
     protected function casts(): array
     {
         return [
-            'date_envoi' => 'datetime',
-            'is_read' => 'boolean',
+            'date_creation' => 'datetime',
+            'lu' => 'boolean',
             'data' => 'array',
         ];
     }
@@ -50,15 +64,15 @@ class Notification extends Model
     }
 
     /**
-     * Boot method to set date_envoi
+     * Boot method to set date_creation
      */
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($notification) {
-            if (!$notification->date_envoi) {
-                $notification->date_envoi = Carbon::now();
+            if (!$notification->date_creation) {
+                $notification->date_creation = Carbon::now();
             }
         });
     }
@@ -68,7 +82,7 @@ class Notification extends Model
      */
     public function scopeUnread($query)
     {
-        return $query->where('is_read', false);
+        return $query->where('lu', false);
     }
 
     /**
@@ -76,7 +90,7 @@ class Notification extends Model
      */
     public function scopeRead($query)
     {
-        return $query->where('is_read', true);
+        return $query->where('lu', true);
     }
 
     /**
@@ -84,7 +98,7 @@ class Notification extends Model
      */
     public function scopeByType($query, $type)
     {
-        return $query->where('type_notification', $type);
+        return $query->where('type', $type);
     }
 
     /**
@@ -92,7 +106,7 @@ class Notification extends Model
      */
     public function scopeRecent($query)
     {
-        return $query->where('date_envoi', '>=', Carbon::now()->subDays(7));
+        return $query->where('date_creation', '>=', Carbon::now()->subDays(7));
     }
 
     /**
@@ -108,7 +122,7 @@ class Notification extends Model
      */
     public function markAsRead(): void
     {
-        $this->update(['is_read' => true]);
+        $this->update(['lu' => true]);
     }
 
     /**
@@ -116,7 +130,7 @@ class Notification extends Model
      */
     public function markAsUnread(): void
     {
-        $this->update(['is_read' => false]);
+        $this->update(['lu' => false]);
     }
 
     /**
@@ -124,7 +138,7 @@ class Notification extends Model
      */
     public function getTimeSinceSentAttribute(): string
     {
-        return $this->date_envoi->diffForHumans();
+        return $this->date_creation->diffForHumans();
     }
 
     /**
@@ -132,10 +146,12 @@ class Notification extends Model
      */
     public function getIconAttribute(): string
     {
-        return match ($this->type_notification) {
+        return match ($this->type) {
             'ticket_nouveau' => 'ticket',
             'ticket_assigne' => 'user-check',
+            'ticket_mis_a_jour' => 'edit',
             'ticket_ferme' => 'check-circle',
+            'commentaire_ajoute' => 'message-circle',
             'panne_signale' => 'alert-triangle',
             'panne_resolue' => 'check-circle-2',
             'intervention_planifiee' => 'calendar',
@@ -151,10 +167,12 @@ class Notification extends Model
      */
     public function getColorAttribute(): string
     {
-        return match ($this->type_notification) {
+        return match ($this->type) {
             'ticket_nouveau' => 'blue',
             'ticket_assigne' => 'green',
+            'ticket_mis_a_jour' => 'blue',
             'ticket_ferme' => 'gray',
+            'commentaire_ajoute' => 'purple',
             'panne_signale' => 'red',
             'panne_resolue' => 'green',
             'intervention_planifiee' => 'yellow',
@@ -172,7 +190,7 @@ class Notification extends Model
     {
         return self::create([
             'user_id' => $userId,
-            'type_notification' => $type,
+            'type' => $type,
             'titre' => $titre,
             'message' => $message,
             'data' => $data,
@@ -192,13 +210,26 @@ class Notification extends Model
     /**
      * Type constants
      */
+    // Ticket related notifications
     const TYPE_TICKET_NEW = 'ticket_nouveau';
     const TYPE_TICKET_ASSIGNED = 'ticket_assigne';
+    const TYPE_TICKET_UPDATED = 'ticket_mis_a_jour';
     const TYPE_TICKET_CLOSED = 'ticket_ferme';
+    
+    // Comment related notifications
+    const TYPE_COMMENT_ADDED = 'commentaire_ajoute';
+    
+    // Equipment related notifications
     const TYPE_PANNE_REPORTED = 'panne_signale';
     const TYPE_PANNE_RESOLVED = 'panne_resolue';
+    
+    // Intervention related notifications
     const TYPE_INTERVENTION_PLANNED = 'intervention_planifiee';
     const TYPE_INTERVENTION_COMPLETED = 'intervention_terminee';
+    
+    // Maintenance related notifications
     const TYPE_MAINTENANCE_DUE = 'maintenance_due';
+    const TYPE_MAINTENANCE_COMPLETED = 'maintenance_terminee';
     const TYPE_EQUIPMENT_EXPIRED = 'equipement_expire';
+    const TYPE_SYSTEM = 'system';
 }

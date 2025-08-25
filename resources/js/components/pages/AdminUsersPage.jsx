@@ -12,7 +12,7 @@ const AdminUsersPage = () => {
 
   // Page and Modal states
   const [showAddPage, setShowAddPage] = useState(false);
-  const [showEditPage, setShowEditPage] = useState(false); // Changed from modal to page
+  const [showEditPage, setShowEditPage] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -24,8 +24,8 @@ const AdminUsersPage = () => {
     matricule: '',
     numero_telephone: '',
     poste_affecte: '',
-    role_id: '', // User must select
-    gender: '' // User must select
+    role_id: '',
+    gender: ''
   });
   const [validationErrors, setValidationErrors] = useState({});
 
@@ -82,8 +82,8 @@ const AdminUsersPage = () => {
       matricule: '',
       numero_telephone: '',
       poste_affecte: '',
-      role_id: '', // Force selection
-      gender: '' // Force selection
+      role_id: '',
+      gender: ''
     });
     setValidationErrors({});
     setError(null);
@@ -91,17 +91,20 @@ const AdminUsersPage = () => {
   };
 
   const openEditPage = (user) => {
+    console.log('Opening edit for user:', user); // Debug: voir les données de l'utilisateur
+    console.log('User gender value:', user.gender); // Debug: voir la valeur du genre
+
     setSelectedUser(user);
     setFormData({
       prenom: user.prenom || '',
       nom: user.nom || '',
       email: user.email || '',
-      password: '', // Empty password for edit
+      password: '',
       matricule: user.matricule || '',
       numero_telephone: user.numero_telephone || '',
       poste_affecte: user.poste_affecte || '',
       role_id: String(user.role_id || ''),
-      gender: user.gender || ''
+      gender: user.gender || '' // This should be pre-filled
     });
     setValidationErrors({});
     setError(null);
@@ -152,17 +155,15 @@ const AdminUsersPage = () => {
       setError(null);
       setValidationErrors({});
 
-      // Client-side validation
       const errors = validateForm(formData);
       if (Object.keys(errors).length > 0) {
         setValidationErrors(errors);
         return;
       }
 
-      // Prepare data for API
       const submitData = {
         ...formData,
-        role_id: parseInt(formData.role_id, 10) // Ensure it's a number
+        role_id: parseInt(formData.role_id, 10)
       };
 
       console.log('Submitting data:', submitData);
@@ -205,22 +206,27 @@ const AdminUsersPage = () => {
       setError(null);
       setValidationErrors({});
 
-      // Client-side validation
       const errors = validateForm(formData, true);
       if (Object.keys(errors).length > 0) {
         setValidationErrors(errors);
         return;
       }
 
-      // Prepare data for API (exclude password if empty)
+      // Prepare data for API
       const submitData = {
-        ...formData,
-        role_id: parseInt(formData.role_id, 10)
+        prenom: formData.prenom,
+        nom: formData.nom,
+        email: formData.email,
+        matricule: formData.matricule,
+        numero_telephone: formData.numero_telephone,
+        poste_affecte: formData.poste_affecte,
+        gender: formData.gender,
+        role_id: parseInt(formData.role_id, 10) // Use the selected role
       };
 
-      // Don't send empty password
-      if (!submitData.password) {
-        delete submitData.password;
+      // Only include password if provided
+      if (formData.password && formData.password.trim()) {
+        submitData.password = formData.password;
       }
 
       console.log('Updating user with data:', submitData);
@@ -242,7 +248,6 @@ const AdminUsersPage = () => {
         setShowSuccessModal(true);
         await fetchUsers();
 
-        // Auto-hide success modal after 2 seconds
         setTimeout(() => {
           setShowSuccessModal(false);
         }, 2000);
@@ -287,6 +292,11 @@ const AdminUsersPage = () => {
 
   const renderFormField = (label, name, type = 'text', options = null, placeholder = null) => {
     const hasError = validationErrors[name];
+
+    // Debug pour le champ gender
+    if (name === 'gender') {
+      console.log(`Gender field - Current value: "${formData[name]}"`);
+    }
 
     return (
       <div style={{ marginBottom: 24 }}>
@@ -358,7 +368,7 @@ const AdminUsersPage = () => {
     );
   }
 
-  // Edit User Page - Same design as Add Page
+  // Edit User Page
   if (showEditPage) {
     return (
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
@@ -374,7 +384,8 @@ const AdminUsersPage = () => {
                 borderRadius: 8,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8
+                gap: 8,
+                cursor: 'pointer'
               }}
             >
               <ArrowLeft size={16} />
@@ -390,7 +401,8 @@ const AdminUsersPage = () => {
               background: '#3b82f6',
               color: 'white',
               border: 0,
-              borderRadius: 8
+              borderRadius: 8,
+              cursor: 'pointer'
             }}
           >
             Revenir
@@ -440,6 +452,8 @@ const AdminUsersPage = () => {
             </div>
           </div>
 
+
+
           {/* Form Fields */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, maxWidth: 800, margin: '0 auto' }}>
             <div>
@@ -448,25 +462,22 @@ const AdminUsersPage = () => {
               {renderFormField('Mot de passe', 'password', 'password', null, 'Laisser vide pour ne pas changer')}
               {renderFormField('Matricule', 'matricule', 'text', null, 'Entrer le matricule')}
               {renderFormField('Gender *', 'gender', 'select', [
-                { value: '', label: 'Sélectionner le genre' },
-                { value: 'male', label: 'Homme' },
-                { value: 'female', label: 'Femme' }
-              ])}
+  { value: '', label: 'Sélectionner le genre' },
+  { value: 'male', label: 'Homme' },      // OLD - doesn't match database
+  { value: 'female', label: 'Femme' }     // OLD - doesn't match database
+])}
+
             </div>
             <div>
               {renderFormField('Nom *', 'nom', 'text', null, 'Entrer le nom')}
               {renderFormField('Numéro de téléphone', 'numero_telephone', 'tel', null, 'Entrer le numéro de téléphone')}
               {renderFormField('Poste affecté', 'poste_affecte', 'text', null, 'Entrer le poste')}
-              {/* Role field removed for edit - typically you don't change roles in edit mode */}
-              {/* If you want to allow role changes, uncomment below: */}
-              {/*
               {renderFormField('Role *', 'role_id', 'select', [
                 { value: '', label: 'Sélectionner un rôle' },
                 { value: '1', label: 'Admin' },
                 { value: '2', label: 'Technicien' },
                 { value: '3', label: 'Utilisateur' }
               ])}
-              */}
             </div>
           </div>
 
@@ -491,7 +502,7 @@ const AdminUsersPage = () => {
         </div>
       </div>
     );
-  };
+  }
 
   if (loading) return <div style={{ minHeight: 300, display: 'grid', placeItems: 'center' }}>Chargement…</div>;
 
@@ -511,7 +522,8 @@ const AdminUsersPage = () => {
                 borderRadius: 8,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8
+                gap: 8,
+                cursor: 'pointer'
               }}
             >
               <ArrowLeft size={16} />
@@ -525,7 +537,8 @@ const AdminUsersPage = () => {
               background: '#3b82f6',
               color: 'white',
               border: 0,
-              borderRadius: 8
+              borderRadius: 8,
+              cursor: 'pointer'
             }}
           >
             Revenir
@@ -665,10 +678,10 @@ const AdminUsersPage = () => {
           <option value="active">Actif</option>
           <option value="inactive">Inactif</option>
         </select>
-        <button onClick={() => { setQuery(''); setRole(''); setStatus(''); }} style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 0, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => { setQuery(''); setRole(''); setStatus(''); }} style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 0, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
           <RefreshCw size={16} /> Reset Filter
         </button>
-        <button onClick={openAddPage} style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 0, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+        <button onClick={openAddPage} style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 0, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', cursor: 'pointer' }}>
           <Plus size={16} /> Ajouter un utilisateur
         </button>
       </div>
@@ -702,20 +715,54 @@ const AdminUsersPage = () => {
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button title="Modifier" onClick={() => openEditPage(u)} style={{ padding: 8, width: 32, height: 32, background: '#111827', color: 'white', border: 0, borderRadius: 6, display: 'grid', placeItems: 'center' }}>
-                    <Edit size={16} />
-                  </button>
-                  <button title="Supprimer" onClick={() => openDeleteModal(u)} style={{ padding: 8, width: 32, height: 32, background: '#111827', color: 'white', border: 0, borderRadius: 6, display: 'grid', placeItems: 'center' }}>
-                    <Trash2 size={16} />
-                  </button>
+                <button
+  title="Modifier"
+  onClick={() => openEditPage(u)}
+  onMouseEnter={(e) => { e.target.style.background = '#f59e0b'; }}
+  onMouseLeave={(e) => { e.target.style.background = '#111827'; }}
+  style={{
+    padding: 8,
+    width: 32,
+    height: 32,
+    background: '#111827',
+    color: 'white',
+    border: 0,
+    borderRadius: 6,
+    display: 'grid',
+    placeItems: 'center',
+    cursor: 'pointer'
+  }}
+>
+  <Edit size={16} />
+</button>
+
+<button
+  title="Supprimer"
+  onClick={() => openDeleteModal(u)}
+  onMouseEnter={(e) => { e.target.style.background = '#ef4444'; }}
+  onMouseLeave={(e) => { e.target.style.background = '#111827'; }}
+  style={{
+    padding: 8,
+    width: 32,
+    height: 32,
+    background: '#111827',
+    color: 'white',
+    border: 0,
+    borderRadius: 6,
+    display: 'grid',
+    placeItems: 'center',
+    cursor: 'pointer'
+  }}
+>
+  <Trash2 size={16} />
+</button>
+
                 </div>
               </div>
             ))
           )}
         </div>
       </div>
-
-      {/* Edit User Modal - REMOVED, now using full page */}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
@@ -731,14 +778,14 @@ const AdminUsersPage = () => {
               Êtes-vous sûr de vouloir supprimer cet utilisateur? Cette action ne peut pas être annulée.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={() => setShowDeleteModal(false)} style={{ padding: '8px 16px', background: 'white', border: '1px solid #d1d5db', borderRadius: 8, color: '#374151' }}>Annuler</button>
-              <button onClick={handleDelete} style={{ padding: '8px 16px', background: '#dc2626', color: 'white', border: 0, borderRadius: 8 }}>Supprimer</button>
+              <button onClick={() => setShowDeleteModal(false)} style={{ padding: '8px 16px', background: 'white', border: '1px solid #d1d5db', borderRadius: 8, color: '#374151', cursor: 'pointer' }}>Annuler</button>
+              <button onClick={handleDelete} style={{ padding: '8px 16px', background: '#dc2626', color: 'white', border: 0, borderRadius: 8, cursor: 'pointer' }}>Supprimer</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Success Modal - Dynamic message */}
+      {/* Success Modal */}
       {showSuccessModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
           <div style={{ background: 'white', borderRadius: 12, padding: 24, width: '90%', maxWidth: 400, textAlign: 'center' }}>
@@ -746,10 +793,10 @@ const AdminUsersPage = () => {
               <Check size={24} style={{ color: '#065f46' }} />
             </div>
             <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px 0', color: '#065f46' }}>
-              {showAddPage ? 'Utilisateur ajouté avec succès!' : 'Utilisateur modifié avec succès!'}
+              {showEditPage ? 'Utilisateur modifié avec succès!' : 'Utilisateur ajouté avec succès!'}
             </h3>
             <p style={{ color: '#6b7280', margin: 0 }}>
-              {showAddPage ? 'L\'utilisateur a été créé et ajouté à la liste.' : 'Les informations de l\'utilisateur ont été mises à jour.'}
+              {showEditPage ? 'Les informations de l\'utilisateur ont été mises à jour.' : 'L\'utilisateur a été créé et ajouté à la liste.'}
             </p>
           </div>
         </div>

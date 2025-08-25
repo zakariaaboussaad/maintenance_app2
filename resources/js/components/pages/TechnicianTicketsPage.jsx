@@ -126,11 +126,11 @@ const TechnicianTicketsPage = ({ user }) => {
 
     const getStatusBadge = (status) => {
         const statusStyles = {
-            'resolu': { backgroundColor: '#d1fae5', color: '#065f46', text: 'Résolu' },
-            'ferme': { backgroundColor: '#e5e7eb', color: '#374151', text: 'Fermé' },
-            'en_cours': { backgroundColor: '#e0e7ff', color: '#3730a3', text: 'En cours' },
-            'en_attente': { backgroundColor: '#fef3c7', color: '#92400e', text: 'En attente' },
             'ouvert': { backgroundColor: '#fee2e2', color: '#991b1b', text: 'Ouvert' },
+            'en_attente': { backgroundColor: '#fef3c7', color: '#92400e', text: 'En Attente' },
+            'en_cours': { backgroundColor: '#dbeafe', color: '#1e40af', text: 'En Cours' },
+            'resolu': { backgroundColor: '#d1fae5', color: '#065f46', text: 'Résolu' },
+            'ferme': { backgroundColor: '#f3f4f6', color: '#6b7280', text: 'Fermé' },
             'annule': { backgroundColor: '#f3f4f6', color: '#6b7280', text: 'Annulé' }
         };
 

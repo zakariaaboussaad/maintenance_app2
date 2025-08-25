@@ -12,16 +12,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('notifications', function (Blueprint $table) {
-            $table->id();
+            $table->id('id_notification');
             $table->string('titre');
             $table->text('message');
             $table->enum('type', [
                 'ticket_nouveau',
                 'ticket_assigne',
-                'ticket_resolu',
-                'panne_detectee',
-                'maintenance_prevue',
-                'equipement_expire',
+                'ticket_mis_a_jour',
+                'ticket_ferme',
+                'commentaire_ajoute',
+                'panne_signale',
+                'panne_resolue',
+                'intervention_planifiee',
                 'system'
             ]);
 

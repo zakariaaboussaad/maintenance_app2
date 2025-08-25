@@ -50,7 +50,11 @@ class Equipement extends Model
      */
     public function typeEquipement()
     {
-        return $this->belongsTo(TypeEquipement::class, 'type_equipement_id', 'id_type');
+        return $this->belongsTo(
+            TypeEquipement::class, 
+            'type_equipement_id', // Foreign key on the equipements table
+            'id_type'             // Primary key on the type_equipements table
+        );
     }
 
     /**
