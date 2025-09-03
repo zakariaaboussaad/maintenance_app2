@@ -1,6 +1,7 @@
 // components/dashboards/UserDashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { Wrench, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Wrench, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight, Lock, Key } from 'lucide-react';
+import PasswordResetPage from '../auth/PasswordResetPage';
 // Check these imports
 import { equipmentService, ticketService } from '../../services/apiService';
 import Sidebar from '../common/Sidebar';
@@ -9,7 +10,7 @@ import StatCard from '../common/StatCard';
 import TicketsPage from '../pages/TicketsPage';
 import UserSettingsPage from '../pages/UserSettingsPage';
 
-const UserDashboard = ({ onLogout, user }) => {
+const UserDashboard = ({ onLogout, user, mustChangePassword, onPasswordChanged }) => {
     const [equipements, setEquipements] = useState([]);
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -18,6 +19,34 @@ const UserDashboard = ({ onLogout, user }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [activeMenuItem, setActiveMenuItem] = useState('home');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [showNavigationWarning, setShowNavigationWarning] = useState(false);
+    const [darkTheme, setDarkTheme] = useState(false);
+
+    // Load theme preference from localStorage
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            setDarkTheme(savedTheme === 'dark');
+        }
+    }, []);
+
+    // Apply theme to document body
+    useEffect(() => {
+        document.body.style.backgroundColor = darkTheme ? '#111827' : '#f8fafc';
+        document.body.style.color = darkTheme ? '#ffffff' : '#000000';
+        return () => {
+            document.body.style.backgroundColor = '';
+            document.body.style.color = '';
+        };
+    }, [darkTheme]);
+
+    const handleMenuClick = (menuId) => {
+        if (mustChangePassword && menuId !== 'settings') {
+            setShowNavigationWarning(true);
+            return;
+        }
+        setActiveMenuItem(menuId);
+    };
 
     useEffect(() => {
         fetchEquipements();
@@ -175,22 +204,42 @@ const UserDashboard = ({ onLogout, user }) => {
     const currentEquipment = equipements[currentIndex];
 
     return (
-        <div style={{minHeight: '100vh', backgroundColor: '#f8fafc'}}>
-            <div style={{display: 'flex'}}>
-                <Sidebar
-                    activeMenuItem={activeMenuItem}
-                    setActiveMenuItem={setActiveMenuItem}
-                    sidebarCollapsed={sidebarCollapsed}
-                    setSidebarCollapsed={setSidebarCollapsed}
+        <div style={{
+            minHeight: '100vh',
+            backgroundColor: '',
+            display: 'flex',
+            flexDirection: 'row'
+        }}>
+            <Sidebar
+                activeMenuItem={activeMenuItem}
+                setActiveMenuItem={handleMenuClick}
+                sidebarCollapsed={sidebarCollapsed}
+                setSidebarCollapsed={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onLogout={onLogout}
+                userRole={user?.role_id || 3}
+                darkTheme={darkTheme}
+            />
+
+            {/* Main Content */}
+            <div style={{
+                flex: '1', 
+                display: 'flex', 
+                flexDirection: 'column',
+                marginLeft: sidebarCollapsed ? '80px' : '280px',
+                transition: 'margin-left 0.3s ease',
+                minHeight: '100vh'
+            }}>
+                <Header
+                    user={user}
                     onLogout={onLogout}
+                    sidebarCollapsed={sidebarCollapsed}
+                    onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+                    userId={user?.id_user || user?.id}
+                    darkTheme={darkTheme}
                 />
 
-                {/* Main Content */}
-                <div style={{flex: '1', display: 'flex', flexDirection: 'column'}}>
-                    <Header user={user} />
-
-                    {/* Page Content */}
-                    <main style={{padding: '40px', flex: '1', fontFamily: 'system-ui, -apple-system, sans-serif'}}>
+                {/* Page Content */}
+                <main style={{padding: '0 40px 40px 40px', flex: '1', fontFamily: 'system-ui, -apple-system, sans-serif', minHeight: 'calc(100vh - 64px)', backgroundColor: darkTheme ? '#111827' : '#f8fafc'}}>
                         {activeMenuItem === 'home' && (
                             <>
                                 <div style={{marginBottom: '40px'}}>
@@ -290,7 +339,12 @@ const UserDashboard = ({ onLogout, user }) => {
                                                 overflow: 'hidden',
                                                 boxShadow: '0 10px 25px rgba(59, 130, 246, 0.3)'
                                             }}>
-                                                <div style={{position: 'relative', zIndex: '10'}}>
+                                                <div style={{
+                                                    position: 'relative', 
+                                                    zIndex: '10',
+                                                    paddingLeft: equipements.length > 1 ? '80px' : '0',
+                                                    paddingRight: equipements.length > 1 ? '80px' : '0'
+                                                }}>
                                                     <div style={{fontSize: '15px', opacity: '0.9', marginBottom: '12px', fontWeight: '500'}}>
                                                         Installé le {formatDate(currentEquipment.date_installation)}
                                                     </div>
@@ -328,64 +382,76 @@ const UserDashboard = ({ onLogout, user }) => {
                                                 {equipements.length > 1 && (
                                                     <>
                                                         <button
-                                                            onClick={previousEquipment}
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                previousEquipment();
+                                                            }}
                                                             style={{
                                                                 position: 'absolute',
-                                                                left: '24px',
+                                                                left: '20px',
                                                                 top: '50%',
                                                                 transform: 'translateY(-50%)',
-                                                                width: '48px',
-                                                                height: '48px',
-                                                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                                                width: '44px',
+                                                                height: '44px',
+                                                                backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                                                                border: '1px solid rgba(255, 255, 255, 0.3)',
                                                                 borderRadius: '50%',
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
                                                                 cursor: 'pointer',
-                                                                border: 'none',
-                                                                transition: 'all 0.3s ease',
-                                                                backdropFilter: 'blur(10px)'
+                                                                transition: 'all 0.2s ease',
+                                                                backdropFilter: 'blur(10px)',
+                                                                zIndex: 20,
+                                                                outline: 'none'
                                                             }}
                                                             onMouseEnter={(e) => {
-                                                                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                                                                e.target.style.transform = 'translateY(-50%) scale(1.05)';
+                                                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+                                                                e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
                                                             }}
                                                             onMouseLeave={(e) => {
-                                                                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                                                                e.target.style.transform = 'translateY(-50%) scale(1)';
+                                                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                                                                e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
                                                             }}
                                                         >
-                                                            <ChevronLeft size={20} style={{color: 'white'}} />
+                                                            <ChevronLeft size={18} style={{color: 'white'}} />
                                                         </button>
                                                         <button
-                                                            onClick={nextEquipment}
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                nextEquipment();
+                                                            }}
                                                             style={{
                                                                 position: 'absolute',
-                                                                right: '24px',
+                                                                right: '20px',
                                                                 top: '50%',
                                                                 transform: 'translateY(-50%)',
-                                                                width: '48px',
-                                                                height: '48px',
-                                                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                                                width: '44px',
+                                                                height: '44px',
+                                                                backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                                                                border: '1px solid rgba(255, 255, 255, 0.3)',
                                                                 borderRadius: '50%',
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
                                                                 cursor: 'pointer',
-                                                                border: 'none',
-                                                                transition: 'all 0.3s ease',
-                                                                backdropFilter: 'blur(10px)'
+                                                                transition: 'all 0.2s ease',
+                                                                backdropFilter: 'blur(10px)',
+                                                                zIndex: 20,
+                                                                outline: 'none'
                                                             }}
                                                             onMouseEnter={(e) => {
-                                                                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                                                                e.target.style.transform = 'translateY(-50%) scale(1.05)';
+                                                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+                                                                e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
                                                             }}
                                                             onMouseLeave={(e) => {
-                                                                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                                                                e.target.style.transform = 'translateY(-50%) scale(1)';
+                                                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                                                                e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
                                                             }}
                                                         >
-                                                            <ChevronRight size={20} style={{color: 'white'}} />
+                                                            <ChevronRight size={18} style={{color: 'white'}} />
                                                         </button>
                                                     </>
                                                 )}
@@ -406,12 +472,15 @@ const UserDashboard = ({ onLogout, user }) => {
                         )}
 
                         {activeMenuItem === 'settings' && (
-                            <UserSettingsPage user={user} />
+                            <UserSettingsPage 
+                                user={user} 
+                                darkTheme={darkTheme} 
+                                setDarkTheme={setDarkTheme} 
+                            />
                         )}
                     </main>
                 </div>
             </div>
-        </div>
     );
 };
 

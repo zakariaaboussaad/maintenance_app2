@@ -13,6 +13,10 @@ const TechnicianMyTicketsPage = ({ user }) => {
         orderType: '',
         orderStatus: ''
     });
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 6;
 
     // États pour les popups
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
@@ -109,6 +113,7 @@ const TechnicianMyTicketsPage = ({ user }) => {
         }
 
         setTickets(filteredTickets);
+        setCurrentPage(1); // Reset to first page when filters change
     };
 
     const formatDate = (dateString) => {
@@ -190,6 +195,26 @@ const TechnicianMyTicketsPage = ({ user }) => {
             orderType: '',
             orderStatus: ''
         });
+        setCurrentPage(1);
+    };
+
+    // Pagination logic
+    const totalPages = Math.ceil(tickets.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentTickets = tickets.slice(startIndex, endIndex);
+    const showPagination = tickets.length > itemsPerPage;
+
+    const handlePreviousPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(currentPage + 1);
+        }
     };
 
     if (loading) {
@@ -419,14 +444,14 @@ const TechnicianMyTicketsPage = ({ user }) => {
                             </div>
                         </div>
                     ) : (
-                        tickets.map((ticket, index) => (
+                        currentTickets.map((ticket, index) => (
                             <div
                                 key={ticket.id}
                                 style={{
                                     display: 'grid',
                                     gridTemplateColumns: '80px 1fr 120px 120px 120px 120px 100px 100px 80px',
                                     padding: '20px 24px',
-                                    borderBottom: index < tickets.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                    borderBottom: index < currentTickets.length - 1 ? '1px solid #f1f5f9' : 'none',
                                     alignItems: 'center',
                                     transition: 'background-color 0.2s',
                                     cursor: 'pointer'
@@ -528,48 +553,59 @@ const TechnicianMyTicketsPage = ({ user }) => {
                 </div>
 
                 {/* Pagination */}
-                <div style={{
-                    padding: '20px 24px',
-                    borderTop: '1px solid #e2e8f0',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    backgroundColor: '#f8fafc'
-                }}>
-                    <div style={{fontSize: '14px', color: '#6b7280'}}>
-                        Showing 1-{tickets.length} of {tickets.length}
-                    </div>
+                {showPagination && (
                     <div style={{
+                        padding: '20px 24px',
+                        borderTop: '1px solid #e2e8f0',
                         display: 'flex',
-                        gap: '8px',
-                        alignItems: 'center'
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        backgroundColor: '#f8fafc'
                     }}>
-                        <button
-                            style={{
-                                padding: '8px 12px',
-                                backgroundColor: 'white',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                            }}
-                        >
-                            &lt;
-                        </button>
-                        <button
-                            style={{
-                                padding: '8px 12px',
-                                backgroundColor: 'white',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                            }}
-                        >
-                            &gt;
-                        </button>
+                        <div style={{fontSize: '14px', color: '#6b7280'}}>
+                            Showing {startIndex + 1}-{Math.min(endIndex, tickets.length)} of {tickets.length}
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            gap: '8px',
+                            alignItems: 'center'
+                        }}>
+                            <button
+                                onClick={handlePreviousPage}
+                                disabled={currentPage === 1}
+                                style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '6px',
+                                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                    fontSize: '14px',
+                                    color: currentPage === 1 ? '#9ca3af' : '#374151'
+                                }}
+                            >
+                                &lt;
+                            </button>
+                            <span style={{fontSize: '14px', color: '#374151', padding: '0 8px'}}>
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <button
+                                onClick={handleNextPage}
+                                disabled={currentPage === totalPages}
+                                style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '6px',
+                                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                                    fontSize: '14px',
+                                    color: currentPage === totalPages ? '#9ca3af' : '#374151'
+                                }}
+                            >
+                                &gt;
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Details Modal (read-only) */}
@@ -598,13 +634,13 @@ const TechnicianMyTicketsPage = ({ user }) => {
                                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16}}>
                                     <div>
                                         <div style={{fontWeight: 600, color: '#111827', marginBottom: 6}}>Problème de l’utilisateur</div>
-                                        <div style={{minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151'}}>
+                                        <div style={{minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', overflow: 'hidden'}}>
                                             {selectedTicket.description || '—'}
                                         </div>
                                     </div>
                                     <div>
                                         <div style={{fontWeight: 600, color: '#111827', marginBottom: 6}}>Commentaire du technicien</div>
-                                        <div style={{minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151'}}>
+                                        <div style={{minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', overflow: 'hidden'}}>
                                             {selectedTicket.commentaire_resolution || '—'}
                                         </div>
                                     </div>
@@ -649,7 +685,7 @@ const TechnicianMyTicketsPage = ({ user }) => {
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
                     backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
                 }}>
-                    <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', width: '90%', maxWidth: '520px' }}>
+                    <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', width: '90%', maxWidth: '520px', maxHeight: '80vh', overflow: 'auto' }}>
                         <h3 style={{marginTop: 0, marginBottom: '16px', color: '#111827'}}>Modifier le ticket</h3>
                         <div style={{display: 'grid', gap: '12px'}}>
                             <label style={{display: 'grid', gap: '6px'}}>
@@ -685,7 +721,16 @@ const TechnicianMyTicketsPage = ({ user }) => {
                                 <textarea rows={4}
                                     value={editForm.commentaire_resolution}
                                     onChange={(e) => setEditForm(prev => ({...prev, commentaire_resolution: e.target.value}))}
-                                    style={{padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px'}}
+                                    style={{
+                                        padding: '10px 12px', 
+                                        border: '1px solid #d1d5db', 
+                                        borderRadius: '8px',
+                                        resize: 'vertical',
+                                        minHeight: '80px',
+                                        maxHeight: '200px',
+                                        width: '100%',
+                                        boxSizing: 'border-box'
+                                    }}
                                 />
                             </label>
                             <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>

@@ -27,25 +27,29 @@ class NotificationController extends Controller
                 'token_present' => $request->bearerToken() ? 'Yes' : 'No'
             ]);
 
-            // Check if user is authenticated
-            $user = Auth::user();
-            if (!$user) {
-                Log::warning('User not authenticated in notifications index');
+            // Get user ID from request parameter since no authentication
+            $userId = $request->get('user_id');
+            if (!$userId) {
+                Log::warning('No user_id provided in notifications request');
                 return response()->json([
                     'success' => false,
-                    'message' => 'Utilisateur non authentifié'
-                ], 401);
+                    'message' => 'ID utilisateur requis'
+                ], 400);
+            }
+
+            $user = User::find($userId);
+            if (!$user) {
+                Log::warning('User not found with ID: ' . $userId);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non trouvé'
+                ], 404);
             }
 
             $query = Notification::with('user');
 
-            // Filter by user if specified, otherwise show all (for admins)
-            if ($request->has('user_id')) {
-                $query->forUser($request->user_id);
-            } elseif ($user->role_id !== 1) {
-                // Non-admin users can only see their own notifications
-                $query->forUser($user->id_user);
-            }
+            // Filter by user ID from request
+            $query->forUser($userId);
 
             // Filter by type if specified
             if ($request->has('type')) {
@@ -73,7 +77,7 @@ class NotificationController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $notifications->items(),
-                'unread_count' => Notification::forUser($user->id_user)->unread()->count(),
+                'unread_count' => Notification::where('user_id', $user->id_user)->where('lu', false)->count(),
                 'pagination' => [
                     'current_page' => $notifications->currentPage(),
                     'per_page' => $notifications->perPage(),
@@ -211,13 +215,31 @@ class NotificationController extends Controller
         try {
             \Log::info('=== MARK AS READ REQUEST ===', ['notification_id' => $id]);
             
-            $user = Auth::user();
-            if (!$user) {
+            // Try multiple ways to get user authentication
+            $userId = session('user_id') ?? request()->input('user_id') ?? Auth::id();
+            
+            if (!$userId) {
+                // Try to get from Laravel's default session auth
+                $sessionUser = Auth::user();
+                if ($sessionUser) {
+                    $userId = $sessionUser->id_user ?? $sessionUser->id;
+                }
+            }
+            
+            if (!$userId) {
                 \Log::warning('User not authenticated in markAsRead');
                 return response()->json([
                     'success' => false,
                     'message' => 'Utilisateur non authentifié'
                 ], 401);
+            }
+
+            $user = User::find($userId);
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non trouvé'
+                ], 404);
             }
 
             \Log::info('User authenticated', ['user_id' => $user->id_user]);
@@ -278,20 +300,28 @@ class NotificationController extends Controller
     /**
      * Mark all notifications as read for current user
      */
-    public function markAllAsRead()
+    public function markAllAsRead(Request $request)
     {
         try {
-            $user = Auth::user();
-            if (!$user) {
+            // Get user_id from request body instead of auth
+            $userId = $request->input('user_id');
+            
+            Log::info('Mark all as read request', [
+                'user_id' => $userId,
+                'request_data' => $request->all()
+            ]);
+            
+            if (!$userId) {
+                Log::error('Mark all as read failed: no user_id provided');
                 return response()->json([
                     'success' => false,
-                    'message' => 'Utilisateur non authentifié'
-                ], 401);
+                    'message' => 'user_id parameter required'
+                ], 400);
             }
 
-            $userId = $user->id_user;
-
-            $updatedCount = Notification::forUser($userId)->unread()->update(['lu' => true]);
+            $updatedCount = Notification::where('user_id', $userId)
+                                      ->where('lu', false)
+                                      ->update(['lu' => true]);
 
             Log::info('All notifications marked as read', [
                 'user_id' => $userId,
@@ -320,12 +350,22 @@ class NotificationController extends Controller
     public function destroy($id)
     {
         try {
-            $user = Auth::user();
-            if (!$user) {
+            // Get user from session instead of Auth::user()
+            $userId = session('user_id') ?? request()->input('user_id');
+            
+            if (!$userId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Utilisateur non authentifié'
                 ], 401);
+            }
+
+            $user = User::find($userId);
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non trouvé'
+                ], 404);
             }
 
             $notification = Notification::findOrFail($id);
@@ -366,19 +406,28 @@ class NotificationController extends Controller
     public function clearAll()
     {
         try {
-            $user = Auth::user();
-            if (!$user) {
+            // Get user from session instead of Auth::user()
+            $userId = session('user_id') ?? request()->input('user_id');
+            
+            if (!$userId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Utilisateur non authentifié'
                 ], 401);
             }
 
-            $userId = $user->id_user;
-            $deletedCount = Notification::forUser($userId)->delete();
+            $user = User::find($userId);
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non trouvé'
+                ], 404);
+            }
+
+            $deletedCount = Notification::forUser($user->id_user)->delete();
 
             Log::info('All notifications cleared', [
-                'user_id' => $userId,
+                'user_id' => $user->id_user,
                 'deleted_count' => $deletedCount
             ]);
 

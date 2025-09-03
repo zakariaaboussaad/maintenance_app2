@@ -45,6 +45,10 @@ const AdminEquipmentsPage = () => {
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // Page and Modal states
   const [showReassignModal, setShowReassignModal] = useState(false);
@@ -88,8 +92,23 @@ const AdminEquipmentsPage = () => {
   const [editValidationErrors, setEditValidationErrors] = useState({});
   const [addValidationErrors, setAddValidationErrors] = useState({});
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => { applyFilters(); }, [query, status, all]);
+  useEffect(() => {
+    load();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [query, status, all]);
+
+  // Check for filter from dashboard navigation
+  useEffect(() => {
+    const dashboardFilter = sessionStorage.getItem('equipements_filter');
+    if (dashboardFilter) {
+      setStatus(dashboardFilter);
+      sessionStorage.removeItem('equipements_filter'); // Clear after use
+    }
+  }, []);
+
   useEffect(() => { filterUsers(); }, [userSearchQuery, availableUsers]);
 
   const load = async () => {
@@ -166,9 +185,26 @@ const openUserSelectionModal = async (forAddForm = false) => {
       const res = await response.json();
       console.log('Users API response:', res);
 
+      // Handle different response formats
+      let usersData = [];
       if (res.success && res.data && Array.isArray(res.data)) {
+        usersData = res.data;
+      } else if (res.success && res.users && Array.isArray(res.users)) {
+        usersData = res.users;
+      } else if (Array.isArray(res)) {
+        usersData = res;
+      } else {
+        console.error('Invalid response format:', res);
+        setError('Format de réponse invalide du serveur');
+        setAvailableUsers([]);
+        setFilteredUsers([]);
+        alert('Erreur lors du chargement des utilisateurs. Veuillez réessayer.');
+        return;
+      }
+
+      if (usersData.length > 0) {
         // Filtrer pour obtenir seulement les utilisateurs normaux actifs
-        let normalUsers = res.data.filter(user => {
+        let normalUsers = usersData.filter(user => {
           const isNormalUser = user.role_id === 3;
           const isActive = user.is_active === true || user.is_active === 1 || user.is_active === "1";
           return isNormalUser && isActive;
@@ -196,12 +232,10 @@ const openUserSelectionModal = async (forAddForm = false) => {
         // Ouvrir la modal SEULEMENT après avoir chargé les utilisateurs
         setShowUserSelectionModal(true);
       } else {
-        console.error('Invalid response format:', res);
-        setError('Format de réponse invalide du serveur');
+        setError('Aucun utilisateur trouvé');
         setAvailableUsers([]);
         setFilteredUsers([]);
-        // Ne pas ouvrir la modal en cas d'erreur
-        alert('Erreur lors du chargement des utilisateurs. Veuillez réessayer.');
+        alert('Aucun utilisateur disponible trouvé.');
       }
     } catch (error) {
       console.error('Erreur lors du chargement des utilisateurs:', error);
@@ -552,8 +586,44 @@ const openUserSelectionModal = async (forAddForm = false) => {
       const q = query.toLowerCase();
       list = list.filter(e => `${e.numero_serie} ${e.modele} ${e.marque} ${e.localisation}`.toLowerCase().includes(q));
     }
-    if (status) list = list.filter(e => (e.status || '').toLowerCase() === status);
+    if (status) {
+    list = list.filter(e => {
+      const equipmentStatus = (e.status || '').toLowerCase();
+      const filterStatus = status.toLowerCase();
+      
+      // Handle different status mappings
+      if (filterStatus === 'en maintenance') {
+        return equipmentStatus === 'en maintenance' || equipmentStatus === 'maintenance';
+      } else if (filterStatus === 'actif') {
+        return equipmentStatus === 'actif' || equipmentStatus === 'active';
+      } else if (filterStatus === 'en veille') {
+        return equipmentStatus === 'en veille' || equipmentStatus === 'idle';
+      }
+      
+      return equipmentStatus === filterStatus;
+    });
+  }
     setItems(list);
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  // Pagination logic
+  const totalPages = Math.ceil(items.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = items.slice(startIndex, endIndex);
+  const showPagination = items.length > itemsPerPage;
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
   const renderAddFormField = (label, name, type = 'text', options = null, placeholder = null) => {
@@ -571,7 +641,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
       console.log('Rendering user field. Selected:', addFormData[name], 'Found user:', selectedUser);
 
       return (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 32 }}>
           <label style={{
             display: 'block',
             marginBottom: 8,
@@ -590,7 +660,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
               style={{
                 width: '100%',
                 padding: '12px 16px',
-                border: `2px solid ${error ? '#dc2626' : '#d1d5db'}`,
+                border: `1px solid ${error ? '#dc2626' : '#d1d5db'}`,
                 borderRadius: 8,
                 fontSize: 14,
                 background: '#f8fafc',
@@ -598,7 +668,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                minHeight: 48,
+                height: 'auto',
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
@@ -651,7 +721,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
     // ... reste du code pour les autres types de champs inchangé
     if (type === 'select') {
       return (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 32 }}>
           <label style={{
             display: 'block',
             marginBottom: 8,
@@ -695,7 +765,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
     }
 
     return (
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 32 }}>
         <label style={{
           display: 'block',
           marginBottom: 8,
@@ -823,19 +893,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
             </button>
             <h1 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', margin: 0 }}>Modifier l'équipement</h1>
           </div>
-          <button
-            onClick={closeEditPage}
-            style={{
-              padding: '8px 16px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 0,
-              borderRadius: 8,
-              cursor: 'pointer'
-            }}
-          >
-            Revenir
-          </button>
+          
         </div>
 
         {error && (
@@ -852,7 +910,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
         )}
 
         <div style={{ background: 'white', borderRadius: 16, padding: 40, border: '1px solid #f1f5f9' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, maxWidth: 800, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', maxWidth: '800px', margin: '0 auto' }}>
             <div>
               {renderEditFormField('modele', 'Modèle')}
               {renderEditFormField('marque', 'Marque')}
@@ -915,19 +973,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
               </button>
               <h1 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', margin: 0 }}>Ajouter un équipement</h1>
             </div>
-            <button
-              onClick={closeAddPage}
-              style={{
-                padding: '8px 16px',
-                background: '#3b82f6',
-                color: 'white',
-                border: 0,
-                borderRadius: 8,
-                cursor: 'pointer'
-              }}
-            >
-              Revenir
-            </button>
+           
           </div>
 
           {error && (
@@ -944,7 +990,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
           )}
 
           <div style={{ background: 'white', borderRadius: 16, padding: 40, border: '1px solid #f1f5f9' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, maxWidth: 800, margin: '0 auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', maxWidth: '800px', margin: '0 auto' }}>
               <div>
                 {renderAddFormField('Numéro de série *', 'numero_serie', 'text', null, 'Entrer le numéro de série')}
                 {renderAddFormField('Modèle *', 'modele', 'text', null, 'Entrer le modèle')}
@@ -1098,7 +1144,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
               </div>
 
               {/* Liste des utilisateurs */}
-              <div style={{ marginBottom: 24 }}>
+              <div style={{ marginBottom: 32 }}>
                 {filteredUsers.length === 0 ? (
                   <div style={{
                     textAlign: 'center',
@@ -1236,7 +1282,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
   // Liste principale des équipements
   return (
     <>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
+      <div style={{ padding: 24 }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 40 }}>
           <h1 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', margin: 0 }}>Parc Informatique</h1>
@@ -1270,9 +1316,10 @@ const openUserSelectionModal = async (forAddForm = false) => {
           marginBottom: '24px',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
+          gap: '12px',
           boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-          border: '1px solid #f1f5f9'
+          border: '1px solid #f1f5f9',
+          flexWrap: 'nowrap'
         }}>
           <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
             <div style={{
@@ -1289,11 +1336,11 @@ const openUserSelectionModal = async (forAddForm = false) => {
             <span style={{fontWeight: '600', color: '#374151'}}>Filter By</span>
           </div>
 
-          <div style={{ position: 'relative', minWidth: '300px' }}>
+          <div style={{ position: 'relative', width: '180px', flexShrink: 0 }}>
             <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
             <input
               type="text"
-              placeholder="Rechercher par numéro de série, modèle, marque..."
+              placeholder="Rechercher "
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               style={{
@@ -1318,7 +1365,9 @@ const openUserSelectionModal = async (forAddForm = false) => {
               backgroundColor: 'white',
               fontSize: '14px',
               color: '#374151',
-              minWidth: '120px'
+              minWidth: '120px',
+              flexShrink: 0,
+              marginLeft: '40px'
             }}
           >
             <option value="">Statut</option>
@@ -1328,7 +1377,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
           </select>
 
           <button
-            onClick={() => { setQuery(''); setStatus(''); }}
+            onClick={() => { setQuery(''); setStatus(''); setCurrentPage(1); }}
             style={{
               padding: '8px 16px',
               backgroundColor: '#ef4444',
@@ -1438,14 +1487,14 @@ const openUserSelectionModal = async (forAddForm = false) => {
                     </div>
                   </div>
                 ) : (
-                  items.map((item, index) => (
+                  currentItems.map((item, index) => (
                     <div
                       key={item.numero_serie}
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '120px 1fr 120px 140px 100px 140px 120px',
                         padding: '16px 24px',
-                        borderBottom: index < items.length - 1 ? '1px solid #f1f5f9' : 'none',
+                        borderBottom: index < currentItems.length - 1 ? '1px solid #f1f5f9' : 'none',
                         alignItems: 'center',
                         fontSize: '14px',
                         transition: 'background-color 0.15s ease',
@@ -1575,6 +1624,61 @@ const openUserSelectionModal = async (forAddForm = false) => {
             </>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {showPagination && (
+          <div style={{
+            padding: '20px 24px',
+            borderTop: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#f8fafc'
+          }}>
+            <div style={{fontSize: '14px', color: '#6b7280'}}>
+              Showing {startIndex + 1}-{Math.min(endIndex, items.length)} of {items.length}
+            </div>
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center'
+            }}>
+              <button
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  color: currentPage === 1 ? '#9ca3af' : '#374151'
+                }}
+              >
+                &lt;
+              </button>
+              <span style={{fontSize: '14px', color: '#374151', padding: '0 8px'}}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  color: currentPage === totalPages ? '#9ca3af' : '#374151'
+                }}
+              >
+                &gt;
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal de réaffectation */}
@@ -1803,7 +1907,7 @@ const openUserSelectionModal = async (forAddForm = false) => {
             </div>
 
           {/* Liste des utilisateurs */}
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 32 }}>
               {filteredUsers.length === 0 ? (
                 <div style={{
                   textAlign: 'center',

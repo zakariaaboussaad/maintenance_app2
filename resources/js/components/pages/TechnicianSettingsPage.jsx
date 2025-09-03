@@ -141,25 +141,24 @@ const TechnicianSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
   const tabs = [
     { id: 'profile', label: 'Profil', icon: User },
     { id: 'password', label: 'Mot de passe', icon: Lock },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'appearance', label: 'Apparence', icon: darkTheme ? Moon : Sun }
   ];
 
   const inputStyle = {
     width: '100%',
     padding: '12px 16px',
-    border: `1px solid ${darkTheme ? '#374151' : '#d1d5db'}`,
+    border: '1px solid #d1d5db',
     borderRadius: '8px',
     fontSize: '14px',
     transition: 'border-color 0.2s',
-    backgroundColor: darkTheme ? '#374151' : '#ffffff',
-    color: darkTheme ? '#ffffff' : '#000000'
+    backgroundColor: '#ffffff',
+    color: '#000000'
   };
 
   const containerStyle = {
     minHeight: '100vh',
-    backgroundColor: darkTheme ? '#111827' : '#f8fafc',
-    color: darkTheme ? '#ffffff' : '#000000',
+    backgroundColor: '#f8fafc',
+    color: '#000000',
     transition: 'all 0.3s ease'
   };
 
@@ -281,7 +280,7 @@ const TechnicianSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                     </p>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginBottom: '32px' }}>
                     <div>
                       <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
                         Prénom *
@@ -420,7 +419,7 @@ const TechnicianSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           type={showCurrentPassword ? 'text' : 'password'}
                           value={passwordData.current_password}
                           onChange={(e) => setPasswordData({...passwordData, current_password: e.target.value})}
-                          style={{ ...inputStyle, paddingRight: '48px' }}
+                          style={{ ...inputStyle, paddingRight: '40px' }}
                           placeholder="Votre mot de passe actuel"
                         />
                         <button
@@ -428,7 +427,7 @@ const TechnicianSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                           style={{
                             position: 'absolute',
-                            right: '12px',
+                            right: '8px',
                             top: '50%',
                             transform: 'translateY(-50%)',
                             background: 'none',
@@ -451,7 +450,7 @@ const TechnicianSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           type={showNewPassword ? 'text' : 'password'}
                           value={passwordData.new_password}
                           onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})}
-                          style={{ ...inputStyle, paddingRight: '48px' }}
+                          style={{ ...inputStyle, paddingRight: '40px' }}
                           placeholder="Nouveau mot de passe (min. 6 caractères)"
                         />
                         <button
@@ -459,7 +458,7 @@ const TechnicianSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           onClick={() => setShowNewPassword(!showNewPassword)}
                           style={{
                             position: 'absolute',
-                            right: '12px',
+                            right: '8px',
                             top: '50%',
                             transform: 'translateY(-50%)',
                             background: 'none',
@@ -482,7 +481,7 @@ const TechnicianSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           type={showConfirmPassword ? 'text' : 'password'}
                           value={passwordData.confirm_password}
                           onChange={(e) => setPasswordData({...passwordData, confirm_password: e.target.value})}
-                          style={{ ...inputStyle, paddingRight: '48px' }}
+                          style={{ ...inputStyle, paddingRight: '40px' }}
                           placeholder="Confirmez le nouveau mot de passe"
                         />
                         <button
@@ -490,7 +489,7 @@ const TechnicianSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                           style={{
                             position: 'absolute',
-                            right: '12px',
+                            right: '8px',
                             top: '50%',
                             transform: 'translateY(-50%)',
                             background: 'none',

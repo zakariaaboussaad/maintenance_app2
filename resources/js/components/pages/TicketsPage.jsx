@@ -9,6 +9,10 @@ const TicketsPage = ({ tickets, loading, onRefresh, user }) => {
         orderType: '',
         orderStatus: ''
     });
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 6;
 
     // États pour la création de ticket
     const [showCreateTicket, setShowCreateTicket] = useState(false);
@@ -152,6 +156,7 @@ const TicketsPage = ({ tickets, loading, onRefresh, user }) => {
         }
 
         setFilteredTickets(filtered);
+        setCurrentPage(1); // Reset to first page when filters change
     };
 
     const handleFilterChange = (filterType, value) => {
@@ -167,6 +172,26 @@ const TicketsPage = ({ tickets, loading, onRefresh, user }) => {
             orderType: '',
             orderStatus: ''
         });
+        setCurrentPage(1);
+    };
+
+    // Pagination logic
+    const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentTickets = filteredTickets.slice(startIndex, endIndex);
+    const showPagination = filteredTickets.length > itemsPerPage;
+
+    const handlePreviousPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(currentPage + 1);
+        }
     };
 
     // Form handlers
@@ -506,14 +531,14 @@ const TicketsPage = ({ tickets, loading, onRefresh, user }) => {
                                     </div>
                                 </div>
                             ) : (
-                                filteredTickets.map((ticket, index) => (
+                                currentTickets.map((ticket, index) => (
                                     <div
                                         key={ticket.id}
                                         style={{
                                             display: 'grid',
                                             gridTemplateColumns: '80px 1fr 140px 140px 120px 100px 90px',
                                             padding: '20px 24px',
-                                            borderBottom: index < filteredTickets.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                            borderBottom: index < currentTickets.length - 1 ? '1px solid #f1f5f9' : 'none',
                                             alignItems: 'center',
                                             transition: 'background-color 0.2s',
                                             cursor: 'pointer'
@@ -561,6 +586,61 @@ const TicketsPage = ({ tickets, loading, onRefresh, user }) => {
                                 ))
                             )}
                         </div>
+
+                        {/* Pagination Controls */}
+                        {showPagination && (
+                            <div style={{
+                                padding: '20px 24px',
+                                borderTop: '1px solid #e2e8f0',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                backgroundColor: '#f8fafc'
+                            }}>
+                                <div style={{fontSize: '14px', color: '#6b7280'}}>
+                                    Showing {startIndex + 1}-{Math.min(endIndex, filteredTickets.length)} of {filteredTickets.length}
+                                </div>
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '8px',
+                                    alignItems: 'center'
+                                }}>
+                                    <button
+                                        onClick={handlePreviousPage}
+                                        disabled={currentPage === 1}
+                                        style={{
+                                            padding: '8px 12px',
+                                            backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                            fontSize: '14px',
+                                            color: currentPage === 1 ? '#9ca3af' : '#374151'
+                                        }}
+                                    >
+                                        &lt;
+                                    </button>
+                                    <span style={{fontSize: '14px', color: '#374151', padding: '0 8px'}}>
+                                        Page {currentPage} of {totalPages}
+                                    </span>
+                                    <button
+                                        onClick={handleNextPage}
+                                        disabled={currentPage === totalPages}
+                                        style={{
+                                            padding: '8px 12px',
+                                            backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                                            fontSize: '14px',
+                                            color: currentPage === totalPages ? '#9ca3af' : '#374151'
+                                        }}
+                                    >
+                                        &gt;
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
@@ -774,12 +854,15 @@ const TicketsPage = ({ tickets, loading, onRefresh, user }) => {
                                         style={{
                                             width: '100%',
                                             minHeight: '120px',
+                                            maxHeight: '200px',
                                             padding: '12px',
                                             border: '1px solid #d1d5db',
                                             borderRadius: '8px',
                                             fontSize: '14px',
                                             fontFamily: 'inherit',
-                                            resize: 'vertical'
+                                            resize: 'vertical',
+                                            boxSizing: 'border-box',
+                                            overflow: 'auto'
                                         }}
                                         maxLength={500}
                                     />
@@ -886,7 +969,13 @@ const TicketsPage = ({ tickets, loading, onRefresh, user }) => {
                                                 borderRadius: '8px',
                                                 fontSize: '14px',
                                                 color: '#374151',
-                                                lineHeight: '1.5'
+                                                lineHeight: '1.5',
+                                                wordWrap: 'break-word',
+                                                whiteSpace: 'pre-wrap',
+                                                overflowWrap: 'break-word',
+                                                wordBreak: 'break-word',
+                                                maxWidth: '100%',
+                                                overflow: 'hidden'
                                             }}>
                                                 {formData.description}
                                             </div>
@@ -954,13 +1043,13 @@ const TicketsPage = ({ tickets, loading, onRefresh, user }) => {
                                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16}}>
                                     <div>
                                         <div style={{fontWeight: 600, color: '#111827', marginBottom: 6}}>Problème de l’utilisateur</div>
-                                        <div style={{minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151'}}>
+                                        <div style={{minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', overflow: 'hidden'}}>
                                             {selectedTicketForView.description || '—'}
                                         </div>
                                     </div>
                                     <div>
                                         <div style={{fontWeight: 600, color: '#111827', marginBottom: 6}}>Commentaire du technicien</div>
-                                        <div style={{minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151'}}>
+                                        <div style={{minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', overflow: 'hidden'}}>
                                             {selectedTicketForView.commentaire_resolution || '—'}
                                         </div>
                                     </div>

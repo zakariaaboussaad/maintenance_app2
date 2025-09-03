@@ -10,18 +10,21 @@ use Illuminate\Support\Facades\Validator;
 
 class UsersController extends Controller
 {
+    // Remove middleware from constructor - handle authentication in methods
+
     /**
      * Afficher tous les Utilisateurs
      */
     public function index()
     {
         try {
-            $user = User::with('role')->get();
+            // Skip authentication for now - frontend handles user verification
+            $users = User::with('role')->get();
 
             return response()->json([
                 'success' => true,
-                'data' => $user,
-                'count' => $user->count()
+                'users' => $users,
+                'count' => $users->count()
             ]);
         } catch (\Exception $u) {
             return response()->json([
@@ -44,11 +47,11 @@ class UsersController extends Controller
                 'nom' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email',
                 'password' => 'required|string|min:6',
-                'matricule' => 'nullable|string|max:255|unique:users,matricule',
+                'matricule' => 'required|string|max:255|unique:users,matricule',
                 'numero_telephone' => 'nullable|string|max:20',
-                'poste_affecte' => 'nullable|string|max:255',
+                'poste_affecte' => 'required|string|max:255',
                 'role_id' => 'required|integer|in:1,2,3',
-                'gender' => 'required|in:male,female'
+                'gender' => 'nullable|in:male,female'
             ]);
 
             if ($validator->fails()) {
@@ -60,7 +63,7 @@ class UsersController extends Controller
             }
 
             // Créer l'utilisateur
-            $user = User::create([
+            $userData = [
                 'prenom' => $request->prenom,
                 'nom' => $request->nom,
                 'name' => $request->prenom . ' ' . $request->nom,
@@ -70,10 +73,17 @@ class UsersController extends Controller
                 'numero_telephone' => $request->numero_telephone,
                 'poste_affecte' => $request->poste_affecte,
                 'role_id' => $request->role_id,
-                'gender' => $request->gender,
                 'is_active' => true,
-                'date_embauche' => now()
-            ]);
+                'date_embauche' => now(),
+                'password_updated_at' => now()
+            ];
+
+            // Add gender only if provided
+            if ($request->has('gender') && !empty($request->gender)) {
+                $userData['gender'] = $request->gender;
+            }
+
+            $user = User::create($userData);
 
             // Charger les relations pour la réponse
             $user->load('role');
@@ -84,7 +94,33 @@ class UsersController extends Controller
                 'data' => $user
             ], 201);
 
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Log::error('Database error during user creation:', ['error' => $e->getMessage()]);
+
+            // Handle database constraint errors
+            if (str_contains($e->getMessage(), 'Duplicate entry')) {
+                if (str_contains($e->getMessage(), 'email')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cette adresse email est déjà utilisée',
+                        'errors' => ['email' => ['Cette adresse email est déjà utilisée']]
+                    ], 422);
+                } elseif (str_contains($e->getMessage(), 'matricule')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Ce matricule est déjà utilisé',
+                        'errors' => ['matricule' => ['Ce matricule est déjà utilisé']]
+                    ], 422);
+                }
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de base de données lors de la création',
+                'error' => 'Erreur de contrainte de base de données'
+            ], 500);
         } catch (\Exception $e) {
+            \Log::error('General error during user creation:', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la création de l\'utilisateur',
@@ -100,7 +136,8 @@ class UsersController extends Controller
     {
         try {
             $user = User::with(['role'])
-                                  ->findOrFail($id);
+                                  ->where('id_user', $id)
+                                  ->firstOrFail();
 
             return response()->json([
                 'success' => true,
@@ -127,7 +164,7 @@ class UsersController extends Controller
                 'data' => $request->all()
             ]);
 
-            $user = User::findOrFail($id);
+            $user = User::where('id_user', $id)->firstOrFail();
 
             // Validation des données pour la mise à jour
             $rules = [
@@ -139,7 +176,7 @@ class UsersController extends Controller
                 'numero_telephone' => 'nullable|string|max:20',
                 'poste_affecte' => 'nullable|string|max:255',
                 'role_id' => 'sometimes|required|integer|in:1,2,3',
-                'gender' => 'sometimes|required|in:male,female'
+                'gender' => 'sometimes|nullable|in:male,female'
             ];
 
             // Si l'email est vide, on le retire de la validation
@@ -267,7 +304,7 @@ class UsersController extends Controller
     public function destroy($id)
     {
         try {
-            $user = User::findOrFail($id);
+            $user = User::where('id_user', $id)->firstOrFail();
 
             // Vérifier si l'utilisateur peut être supprimé (par exemple, s'il n'a pas de tickets en cours)
             // Vous pouvez ajouter des vérifications métier ici

@@ -282,13 +282,16 @@ class TicketController extends Controller
 
                         \Log::info('Creating reassignment notification with data: ' . json_encode($data));
 
-                        $result2 = \App\Models\Notification::createForUser(
-                            $ticket->user_id,
-                            \App\Models\Notification::TYPE_TICKET_ASSIGNED,
-                            $titre,
-                            $message,
-                            $data
-                        );
+                        $result2 = \App\Models\Notification::create([
+                            'user_id' => $ticket->user_id,
+                            'type' => \App\Models\Notification::TYPE_TICKET_ASSIGNED,
+                            'titre' => $titre,
+                            'message' => $message,
+                            'data' => json_encode($data),
+                            'ticket_id' => $ticket->id,
+                            'date_creation' => now(),
+                            'lu' => false,
+                        ]);
                         \Log::info('Ticket reassignment notification result: ' . ($result2 ? 'success with ID ' . ($result2->id ?? 'unknown') : 'FAILED'));
                         
                         if (!$result2) {
@@ -412,6 +415,10 @@ class TicketController extends Controller
                 $ticket->priorite = $request->priorite;
             }
             
+            // Handle comment addition - check for new comments vs existing resolution updates
+            // IMPORTANT: Get old values BEFORE updating the ticket
+            $oldResolutionComment = $ticket->commentaire_resolution ?? '';
+            
             if ($request->has('commentaire_resolution')) {
                 $ticket->commentaire_resolution = $request->commentaire_resolution;
             }
@@ -496,7 +503,6 @@ class TicketController extends Controller
                 }
             }
             
-            // Handle comment addition - check for new comments vs existing resolution updates
             $commentContent = null;
             $isNewComment = false;
             
@@ -504,11 +510,26 @@ class TicketController extends Controller
             if ($request->has('comment') && !empty($request->comment)) {
                 $commentContent = $request->comment;
                 $isNewComment = true;
+                \Log::info('DETECTED NEW COMMENT FIELD - will create notification');
             }
-            // Check if commentaire_resolution is being updated
+            // Check if commentaire_resolution is being updated (only if it's different from current value)
             elseif ($request->has('commentaire_resolution') && !empty($request->commentaire_resolution)) {
-                $commentContent = $request->commentaire_resolution;
-                $isNewComment = true;
+                $newResolutionComment = $request->commentaire_resolution;
+                
+                \Log::info('Resolution comment comparison:', [
+                    'old' => $oldResolutionComment,
+                    'new' => $newResolutionComment,
+                    'are_different' => $oldResolutionComment !== $newResolutionComment
+                ]);
+                
+                // Only treat as new comment if the resolution comment actually changed
+                if ($oldResolutionComment !== $newResolutionComment) {
+                    $commentContent = $request->commentaire_resolution;
+                    $isNewComment = true;
+                    \Log::info('DETECTED NEW RESOLUTION COMMENT - will create notification');
+                } else {
+                    \Log::info('RESOLUTION COMMENT UNCHANGED - no notification needed');
+                }
             }
             
             if ($commentContent && $isNewComment) {

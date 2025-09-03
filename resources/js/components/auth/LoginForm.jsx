@@ -2,13 +2,22 @@
 import React, { useState } from 'react';
 import { authService } from '../../services/apiService';
 
-const LoginForm = ({ onLogin }) => {
+const LoginForm = ({ onLogin, onForgotPassword }) => {
     const [formData, setFormData] = useState({
         email: '',
         password: ''
     });
+    const [forgotPasswordData, setForgotPasswordData] = useState({
+        nom: '',
+        email: '',
+        default_password: ''
+    });
     const [errors, setErrors] = useState({});
     const [isLoading, setIsLoading] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+    const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
+    const [passwordExpiryWarning, setPasswordExpiryWarning] = useState('');
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -52,11 +61,26 @@ const LoginForm = ({ onLogin }) => {
 
         setIsLoading(true);
         setErrors({});
+        setPasswordExpiryWarning('');
 
         try {
             const result = await authService.login(formData.email, formData.password);
 
             if (result.success) {
+                // Check for password expiry warning
+                if (result.password_expiry_warning) {
+                    setPasswordExpiryWarning(`⚠️ Votre mot de passe expire dans ${result.password_days_remaining} jours. Veuillez le changer dans les paramètres.`);
+                }
+                
+                // Check if user must reset password
+                if (result.must_change_password) {
+                    // Redirect to password reset lock page
+                    localStorage.setItem('temp_token', result.token);
+                    localStorage.setItem('temp_user', JSON.stringify(result.user));
+                    window.location.href = '/password-reset-lock';
+                    return;
+                }
+                
                 onLogin(result.user);
             } else {
                 setErrors({
@@ -69,6 +93,67 @@ const LoginForm = ({ onLogin }) => {
             });
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleForgotPassword = async (e) => {
+        e.preventDefault();
+        
+        if (!forgotPasswordData.nom || !forgotPasswordData.email || !forgotPasswordData.default_password) {
+            setErrors({ forgot: 'Veuillez remplir tous les champs' });
+            return;
+        }
+
+        setForgotPasswordLoading(true);
+        setErrors({});
+
+        try {
+            const response = await fetch('/api/forgot-password/verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    name: forgotPasswordData.nom,
+                    email: forgotPasswordData.email,
+                    default_password: forgotPasswordData.default_password
+                })
+            });
+
+            console.log('LoginForm response status:', response.status);
+            const result = await response.json();
+            console.log('LoginForm response data:', result);
+
+            if (response.ok && result.success) {
+                console.log('Success! Triggering password reset page...');
+                // Store temporary token and user data for password reset
+                localStorage.setItem('temp_token', result.token);
+                localStorage.setItem('temp_user', JSON.stringify(result.user));
+                
+                // Clear the form and hide forgot password section
+                setShowForgotPassword(false);
+                setForgotPasswordData({ nom: '', email: '', default_password: '' });
+                setErrors({});
+                
+                // Small delay to ensure state updates, then trigger callback
+                setTimeout(() => {
+                    if (onForgotPassword) {
+                        console.log('Calling onForgotPassword callback...');
+                        onForgotPassword();
+                    } else {
+                        console.error('onForgotPassword callback not provided');
+                    }
+                }, 100);
+            } else {
+                setErrors({ forgot: result.message || 'Erreur lors de la vérification' });
+            }
+        } catch (error) {
+            console.error('LoginForm error:', error);
+            setErrors({ forgot: error.message || 'Erreur de connexion' });
+        } finally {
+            setForgotPasswordLoading(false);
         }
     };
 
@@ -176,6 +261,40 @@ const LoginForm = ({ onLogin }) => {
                         )}
                     </div>
 
+                    {/* Forgot Password Link */}
+                    <div style={{textAlign: 'right', marginBottom: '20px'}}>
+                        <button
+                            type="button"
+                            onClick={onForgotPassword}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#3b82f6',
+                                fontSize: '14px',
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                            }}
+                        >
+                            Mot de passe oublié ?
+                        </button>
+                    </div>
+
+                    {/* Password Expiry Warning */}
+                    {passwordExpiryWarning && (
+                        <div style={{
+                            backgroundColor: '#fef3c7',
+                            border: '1px solid #f59e0b',
+                            color: '#92400e',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            marginBottom: '20px',
+                            fontSize: '14px',
+                            textAlign: 'center'
+                        }}>
+                            ⚠️ {passwordExpiryWarning}
+                        </div>
+                    )}
+
                     <button
                         onClick={handleSubmit}
                         disabled={isLoading}
@@ -225,17 +344,8 @@ const LoginForm = ({ onLogin }) => {
                     </button>
                 </div>
 
-                <div style={{marginTop: '24px', padding: '16px', backgroundColor: '#f1f5f9', borderRadius: '8px', border: '1px solid #e2e8f0'}}>
-                    <p style={{fontSize: '12px', color: '#64748b', fontWeight: '600', marginBottom: '8px'}}>
-                        🎮 Mode Démo - Comptes de test:
-                    </p>
-                    <div style={{fontSize: '11px', color: '#64748b', lineHeight: '1.6'}}>
-                        • admin@onee.com / 123456 (Admin - role_id: 1)<br/>
-                        • technicien@onee.com / 123456 (Technicien - role_id: 2)<br/>
-                        • user@onee.com / 123456 (Utilisateur - role_id: 3)<br/>
-                        • <em>Ou connectez-vous avec vos vraies données</em>
-                    </div>
-                </div>
+                
+
             </div>
         </div>
     );

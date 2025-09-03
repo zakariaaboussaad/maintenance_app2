@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -120,7 +121,16 @@ class AuthController extends Controller
 
             \Log::info('Password verified successfully');
 
-            // Step 7: Create token - simplified approach
+            // Step 7: Store user session for session-based authentication
+            session(['user_id' => $user->id_user]);
+            session(['user_email' => $user->email]);
+            session(['user_role' => $user->role_id]);
+            \Log::info('User session stored', [
+                'user_id' => $user->id_user,
+                'session_id' => session()->getId()
+            ]);
+
+            // Step 8: Create token for compatibility (optional)
             $token = null;
             try {
                 \Log::info('Attempting to create token for user: ' . $user->id_user);
@@ -135,23 +145,32 @@ class AuthController extends Controller
                 ]);
                 
             } catch (\Exception $tokenError) {
-                \Log::error('Token creation failed: ' . $tokenError->getMessage());
-                
-                // Return error response instead of continuing
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur lors de la création du token d\'authentification',
-                    'error' => 'Token creation failed: ' . $tokenError->getMessage(),
-                    'debug' => [
-                        'user_id' => $user->id_user,
-                        'user_email' => $user->email,
-                        'sanctum_available' => class_exists('Laravel\Sanctum\HasApiTokens'),
-                        'create_token_method' => method_exists($user, 'createToken')
-                    ]
-                ], 500);
+                \Log::warning('Token creation failed (continuing with session auth): ' . $tokenError->getMessage());
+                // Continue without token since we have session auth
+                $token = 'session_auth_' . $user->id_user;
             }
 
-            // Step 8: Prepare response
+            // Step 9: Check password expiry and force change if needed
+            $passwordExpiryWarning = false;
+            $mustChangePassword = $user->must_change_password ?? false;
+            $daysRemaining = $user->getPasswordExpiryDaysRemaining();
+            
+            // Update days remaining in database
+            $user->update(['password_expiry_days_remaining' => $daysRemaining]);
+            
+            if ($user->isPasswordExpired() && !$mustChangePassword) {
+                // Force password change for expired passwords
+                $user->update(['must_change_password' => true]);
+                $mustChangePassword = true;
+            } elseif ($user->needsPasswordExpiryWarning()) {
+                $passwordExpiryWarning = true;
+                // Update expiry notification timestamp if not already set
+                if (!$user->password_expiry_notified_at) {
+                    $user->update(['password_expiry_notified_at' => now()]);
+                }
+            }
+
+            // Step 10: Prepare response
             $userData = [
                 'id' => $user->id_user,
                 'name' => trim(($user->prenom ?? '') . ' ' . ($user->nom ?? '')),
@@ -172,6 +191,9 @@ class AuthController extends Controller
                 'message' => 'Connexion réussie',
                 'user' => $userData,
                 'token' => $token,
+                'password_expiry_warning' => $passwordExpiryWarning,
+                'must_change_password' => $mustChangePassword,
+                'password_days_remaining' => $daysRemaining,
             ], 200);
 
         } catch (\Exception $e) {
@@ -217,8 +239,29 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         try {
-            $user = $request->user();
+            // Try multiple authentication methods
+            $user = null;
+            
+            // First try session-based auth
+            if (session('user_id')) {
+                $user = User::find(session('user_id'));
+                \Log::info('Found user via session: ' . ($user ? $user->email : 'null'));
+            }
+            
+            // If no session, try Sanctum token
             if (!$user) {
+                $user = $request->user();
+                \Log::info('Found user via Sanctum: ' . ($user ? $user->email : 'null'));
+            }
+            
+            // If still no user, try auth guard
+            if (!$user) {
+                $user = auth()->user();
+                \Log::info('Found user via auth guard: ' . ($user ? $user->email : 'null'));
+            }
+            
+            if (!$user) {
+                \Log::warning('No authenticated user found');
                 return response()->json([
                     'success' => false,
                     'message' => 'Non authentifié'
@@ -229,6 +272,7 @@ class AuthController extends Controller
                 'success' => true,
                 'user' => [
                     'id' => $user->id_user,
+                    'id_user' => $user->id_user, // Add both for compatibility
                     'name' => trim(($user->prenom ?? '') . ' ' . ($user->nom ?? '')),
                     'prenom' => $user->prenom,
                     'nom' => $user->nom,

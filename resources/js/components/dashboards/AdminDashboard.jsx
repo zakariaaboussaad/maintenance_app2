@@ -11,6 +11,7 @@ import UserHistoryPage from '../pages/UserHistoryPage';
 import EquipmentHistoryPage from '../pages/EquipmentHistoryPage';
 import ExcelReportsPage from '../pages/ExcelReportsPage';
 import AdminPasswordRequestsPage from '../pages/AdminPasswordRequestsPage';
+import AdminDefaultPasswordsPage from '../pages/AdminDefaultPasswordsPage';
 
 const AdminDashboard = ({ onLogout, user }) => {
   const [activeMenuItem, setActiveMenuItem] = useState('home');
@@ -35,10 +36,19 @@ const AdminDashboard = ({ onLogout, user }) => {
     };
   }, [darkTheme]);
 
+  const handleNavigateToPage = (page, filter = null) => {
+    setActiveMenuItem(page);
+    
+    // Store filter in sessionStorage for the target page to pick up
+    if (filter) {
+      sessionStorage.setItem(`${page}_filter`, filter);
+    }
+  };
+
   const renderPageContent = () => {
     switch (activeMenuItem) {
       case 'home':
-        return <AdminDashboardPage user={user} darkTheme={darkTheme} />;
+        return <AdminDashboardPage user={user} darkTheme={darkTheme} onNavigateToPage={handleNavigateToPage} />;
       case 'tickets':
         return <AdminTicketsPage user={user} darkTheme={darkTheme} />;
       case 'my-tickets':
@@ -55,15 +65,17 @@ const AdminDashboard = ({ onLogout, user }) => {
         return <ExcelReportsPage darkTheme={darkTheme} />;
       case 'settings':
         return <AdminSettingsPage user={user} darkTheme={darkTheme} setDarkTheme={setDarkTheme} />;
+      case 'default-passwords':
+        return <AdminDefaultPasswordsPage user={user} darkTheme={darkTheme} />;
       default:
-        return <AdminDashboardPage user={user} darkTheme={darkTheme} />;
+        return <AdminDashboardPage user={user} darkTheme={darkTheme} onNavigateToPage={handleNavigateToPage} />;
     }
   };
 
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: darkTheme ? '#111827' : '#f8fafc',
+      backgroundColor: darkTheme ? '#111827' : '',
       transition: 'background-color 0.3s ease'
     }}>
       <div style={{display: 'flex'}}>
@@ -77,15 +89,22 @@ const AdminDashboard = ({ onLogout, user }) => {
           darkTheme={darkTheme}
         />
 
-        <div style={{flex: '1', display: 'flex', flexDirection: 'column'}}>
+        <div style={{
+          flex: '1', 
+          display: 'flex', 
+          flexDirection: 'column',
+          marginLeft: sidebarCollapsed ? '80px' : '280px',
+          transition: 'margin-left 0.3s ease'
+        }}>
           <Header user={user} darkTheme={darkTheme} />
 
           <main style={{
-            padding: '40px',
+            padding: '24px 40px 40px 40px',
             flex: 1,
             fontFamily: 'system-ui, -apple-system, sans-serif',
-            minHeight: 'calc(100vh - 80px)',
-            overflow: 'auto'
+            minHeight: 'calc(100vh - 64px)',
+            overflow: 'auto',
+            backgroundColor: darkTheme ? '#111827' : '#f8fafc'
           }}>
             {renderPageContent()}
           </main>

@@ -18,8 +18,20 @@ class HistoryController extends Controller
     public function getUsersHistory(Request $request)
     {
         try {
-            // Check if user is admin
-            $user = Auth::user();
+            // Enhanced authentication logic (prioritize sanctum, fallback to token parsing)
+            $user = Auth::guard('sanctum')->user();
+            
+            if (!$user) {
+                // Fallback: try to parse bearer token directly
+                $token = request()->bearerToken();
+                if ($token) {
+                    $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+                    if ($personalAccessToken) {
+                        $user = $personalAccessToken->tokenable;
+                    }
+                }
+            }
+            
             if (!$user || !$user->isAdmin()) {
                 return response()->json([
                     'success' => false,
@@ -79,8 +91,20 @@ class HistoryController extends Controller
     public function getUserTickets(Request $request, $userId)
     {
         try {
-            // Check if user is admin
-            $user = Auth::user();
+            // Enhanced authentication logic (prioritize sanctum, fallback to token parsing)
+            $user = Auth::guard('sanctum')->user();
+            
+            if (!$user) {
+                // Fallback: try to parse bearer token directly
+                $token = request()->bearerToken();
+                if ($token) {
+                    $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+                    if ($personalAccessToken) {
+                        $user = $personalAccessToken->tokenable;
+                    }
+                }
+            }
+            
             if (!$user || !$user->isAdmin()) {
                 return response()->json([
                     'success' => false,
@@ -155,8 +179,20 @@ class HistoryController extends Controller
     public function getEquipmentsHistory(Request $request)
     {
         try {
-            // Check if user is admin
-            $user = Auth::user();
+            // Enhanced authentication logic (prioritize sanctum, fallback to token parsing)
+            $user = Auth::guard('sanctum')->user();
+            
+            if (!$user) {
+                // Fallback: try to parse bearer token directly
+                $token = request()->bearerToken();
+                if ($token) {
+                    $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+                    if ($personalAccessToken) {
+                        $user = $personalAccessToken->tokenable;
+                    }
+                }
+            }
+            
             if (!$user || !$user->isAdmin()) {
                 return response()->json([
                     'success' => false,
@@ -210,8 +246,20 @@ class HistoryController extends Controller
     public function getEquipmentIssues(Request $request, $equipmentId)
     {
         try {
-            // Check if user is admin
-            $user = Auth::user();
+            // Enhanced authentication logic (prioritize sanctum, fallback to token parsing)
+            $user = Auth::guard('sanctum')->user();
+            
+            if (!$user) {
+                // Fallback: try to parse bearer token directly
+                $token = request()->bearerToken();
+                if ($token) {
+                    $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+                    if ($personalAccessToken) {
+                        $user = $personalAccessToken->tokenable;
+                    }
+                }
+            }
+            
             if (!$user || !$user->isAdmin()) {
                 return response()->json([
                     'success' => false,

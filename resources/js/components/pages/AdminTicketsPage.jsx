@@ -10,6 +10,10 @@ const AdminTicketsPage = ({ user }) => {
   const [error, setError] = useState(null);
 
   const [filters, setFilters] = useState({ date: '', orderType: '', orderStatus: '' });
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // assignment modal state
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
@@ -30,6 +34,15 @@ const AdminTicketsPage = ({ user }) => {
   useEffect(() => {
     applyFilters();
   }, [filters, allTickets]);
+
+  // Check for filter from dashboard navigation
+  useEffect(() => {
+    const dashboardFilter = sessionStorage.getItem('tickets_filter');
+    if (dashboardFilter) {
+      setFilters(prev => ({ ...prev, orderStatus: dashboardFilter }));
+      sessionStorage.removeItem('tickets_filter'); // Clear after use
+    }
+  }, []);
 
   const fetchTickets = async () => {
     try {
@@ -75,9 +88,47 @@ const AdminTicketsPage = ({ user }) => {
       });
     }
     if (filters.orderStatus) {
-      items = items.filter(t => t.status === filters.orderStatus);
+      items = items.filter(t => {
+        const status = t.status?.toLowerCase();
+        const filterStatus = filters.orderStatus?.toLowerCase();
+        
+        // Handle different status mappings
+        if (filterStatus === 'en cours') {
+          return status === 'en cours' || status === 'in_progress' || status === 'en_cours';
+        } else if (filterStatus === 'fermé') {
+          return status === 'fermé' || status === 'closed' || status === 'ferme';
+        } else if (filterStatus === 'résolu') {
+          return status === 'résolu' || status === 'resolved' || status === 'resolu';
+        } else if (filterStatus === 'en attente') {
+          return status === 'en attente' || status === 'pending' || status === 'en_attente';
+        } else if (filterStatus === 'ouvert') {
+          return status === 'ouvert' || status === 'open' || status === 'nouveau';
+        }
+        
+        return status === filterStatus;
+      });
     }
     setTickets(items);
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  // Pagination logic
+  const totalPages = Math.ceil(tickets.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentTickets = tickets.slice(startIndex, endIndex);
+  const showPagination = tickets.length > itemsPerPage;
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
   const formatDate = (d) => {
@@ -312,7 +363,7 @@ const AdminTicketsPage = ({ user }) => {
           <option value="ouvert">Ouvert</option>
           <option value="en_attente">En attente</option>
         </select>
-        <button onClick={() => setFilters({ date: '', orderType: '', orderStatus: '' })} style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 0, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => { setFilters({ date: '', orderType: '', orderStatus: '' }); setCurrentPage(1); }} style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 0, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           <RefreshCw size={16} /> Reset Filter
         </button>
       </div>
@@ -331,8 +382,8 @@ const AdminTicketsPage = ({ user }) => {
         </div>
 
         <div>
-          {tickets.map((ticket, index) => (
-            <div key={ticket.id} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 120px 120px 120px 120px 100px 100px 100px', padding: '20px 24px', borderBottom: index < tickets.length - 1 ? '1px solid #f1f5f9' : 'none', alignItems: 'center' }}>
+          {currentTickets.map((ticket, index) => (
+            <div key={ticket.id} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 120px 120px 120px 120px 100px 100px 100px', padding: '20px 24px', borderBottom: index < currentTickets.length - 1 ? '1px solid #f1f5f9' : 'none', alignItems: 'center' }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#6b7280' }}>{String(ticket.id).padStart(5, '0')}</div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>{ticket.equipement?.type_equipement?.nom_type || 'N/A'} - {ticket.equipement?.modele || 'N/A'}</div>
@@ -408,6 +459,61 @@ const AdminTicketsPage = ({ user }) => {
             </div>
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        {showPagination && (
+          <div style={{
+            padding: '20px 24px',
+            borderTop: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#f8fafc'
+          }}>
+            <div style={{fontSize: '14px', color: '#6b7280'}}>
+              Showing {startIndex + 1}-{Math.min(endIndex, tickets.length)} of {tickets.length}
+            </div>
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center'
+            }}>
+              <button
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  color: currentPage === 1 ? '#9ca3af' : '#374151'
+                }}
+              >
+                &lt;
+              </button>
+              <span style={{fontSize: '14px', color: '#374151', padding: '0 8px'}}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  color: currentPage === totalPages ? '#9ca3af' : '#374151'
+                }}
+              >
+                &gt;
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {detailsOpen && selectedTicket && (
@@ -431,11 +537,11 @@ const AdminTicketsPage = ({ user }) => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div>
                     <div style={{ fontWeight: 600, color: '#111827', marginBottom: 6 }}>Probléme de l'utilisateur</div>
-                    <div style={{ minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151' }}>{selectedTicket.description || '—'}</div>
+                    <div style={{ minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', overflow: 'hidden' }}>{selectedTicket.description || '—'}</div>
                   </div>
                   <div>
                     <div style={{ fontWeight: 600, color: '#111827', marginBottom: 6 }}>Commentaire du technicien</div>
-                    <div style={{ minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151' }}>{selectedTicket.commentaire_resolution || '—'}</div>
+                    <div style={{ minHeight: 90, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, whiteSpace: 'pre-wrap', color: '#374151', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', overflow: 'hidden' }}>{selectedTicket.commentaire_resolution || '—'}</div>
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>

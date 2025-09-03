@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, X, Clock, CheckCircle, AlertCircle, User, Ticket, Wrench, Calendar, RefreshCw } from 'lucide-react';
 import { authService } from '../../services/apiService';
+import PasswordExpiryTimer from '../pages/PasswordExpiryTimer';
 
 const Header = ({ user, darkTheme = false, onAuthError = null }) => {
     const [showNotifications, setShowNotifications] = useState(false);
@@ -13,7 +14,7 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
     const notificationRef = useRef(null);
     const bellRef = useRef(null);
 
-    // Fetch notifications from API with proper authentication
+    // Fetch notifications from API
     const fetchNotifications = async () => {
         console.log('📡 Fetching notifications...');
         setLoading(true);
@@ -28,16 +29,6 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 return;
             }
 
-            const token = authService.getToken();
-            if (!token) {
-                console.warn('⚠️ No auth token found');
-                setError('Session expirée. Veuillez vous reconnecter.');
-                setNotifications([]);
-                setUnreadCount(0);
-                if (onAuthError) onAuthError();
-                return;
-            }
-
             console.log('📡 Making request to /api/notifications for user:', user.id);
 
             const headers = {
@@ -46,11 +37,6 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 'X-Requested-With': 'XMLHttpRequest'
             };
 
-            // Add Authorization header if not demo mode
-            if (!authService.isDemoMode()) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-
             const response = await fetch(`/api/notifications?user_id=${user.id}`, {
                 method: 'GET',
                 headers,
@@ -58,54 +44,43 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
             });
 
             console.log('📡 Response status:', response.status);
-            console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    console.error('🔒 Authentication failed');
-                    if (onAuthError) {
-                        onAuthError();
-                    }
-                    throw new Error('Session expirée. Veuillez vous reconnecter.');
+                    console.log('🔒 Authentication required - skipping notifications');
+                    setNotifications([]);
+                    setUnreadCount(0);
+                    return;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                if (response.status === 404) {
-                    throw new Error('Service de notifications indisponible.');
-                }
-
-                // Try to get error message from response
-                let errorMessage = `Erreur ${response.status}: ${response.statusText}`;
-                try {
-                    const errorData = await response.json();
-                    if (errorData.message) {
-                        errorMessage = errorData.message;
-                    }
-                } catch (e) {
-                    // If can't parse JSON, use default message
-                }
-
-                throw new Error(errorMessage);
             }
 
             const data = await response.json();
-            console.log('📡 API Response data:', data);
-
-            if (data.success) {
-                setNotifications(data.data || []);
-                setUnreadCount(data.unread_count || 0);
-                setRetryCount(0); // Reset retry count on success
-                console.log('✅ Notifications loaded:', data.data?.length || 0);
+            console.log('📡 Notifications data:', data);
+            
+            if (data.success && Array.isArray(data.data)) {
+                console.log('📋 Detailed notifications breakdown:');
+                data.data.forEach((notif, index) => {
+                    console.log(`  ${index + 1}. Type: ${notif.type} | Read: ${notif.lu ? 'Yes' : 'No'} | Title: ${notif.titre}`);
+                });
+                
+                setNotifications(data.data);
+                const unread = data.data.filter(n => !n.lu).length;
+                setUnreadCount(unread);
+                setRetryCount(0);
+                console.log(`✅ Loaded ${data.data.length} notifications (${unread} unread)`);
             } else {
-                throw new Error(data.message || 'Erreur lors du chargement des notifications');
-            }
-        } catch (err) {
-            console.error('❌ Error fetching notifications:', err);
-            setError(err.message);
-
-            // Only clear notifications for auth errors
-            if (err.message.includes('Session expirée') || err.message.includes('authentification')) {
+                console.warn('⚠️ Invalid notification data format:', data);
                 setNotifications([]);
                 setUnreadCount(0);
             }
+
+        } catch (error) {
+            console.error('❌ Error fetching notifications:', error);
+            setError(error.message);
+            setNotifications([]);
+            setUnreadCount(0);
         } finally {
             setLoading(false);
         }
@@ -135,7 +110,7 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
         // Initial fetch
         fetchNotifications();
 
-        // Set up polling for real-time updates every 30 seconds
+        // Set up polling for real-time updates every 10 seconds
         const interval = setInterval(() => {
             if (user?.id) {
                 console.log('🔄 Polling notifications...');
@@ -144,11 +119,22 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 console.log('⏹️ Stopping polling - no user');
                 clearInterval(interval);
             }
-        }, 30000);
+        }, 10000);
+
+        // Also refresh when tab becomes visible again
+        const handleVisibilityChange = () => {
+            if (!document.hidden && user?.id) {
+                console.log('🔄 Tab became visible - refreshing notifications');
+                fetchNotifications();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             console.log('🧹 Cleaning up notification polling');
             clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [user?.id]); // Only depend on user ID
 
@@ -232,13 +218,6 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 return;
             }
 
-            const token = authService.getToken();
-            if (!token) {
-                setError('Session expirée. Veuillez vous reconnecter.');
-                if (onAuthError) onAuthError();
-                return;
-            }
-
             console.log('📝 Marking notification as read:', id);
 
             const headers = {
@@ -246,11 +225,6 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             };
-
-            // Add Authorization header if not demo mode
-            if (!authService.isDemoMode()) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
 
             const response = await fetch(`/api/notifications/${id}/read`, {
                 method: 'PUT',
@@ -297,13 +271,6 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 return;
             }
 
-            const token = authService.getToken();
-            if (!token) {
-                setError('Session expirée. Veuillez vous reconnecter.');
-                if (onAuthError) onAuthError();
-                return;
-            }
-
             console.log('🗑️ Deleting notification:', id);
 
             const headers = {
@@ -312,15 +279,13 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 'X-Requested-With': 'XMLHttpRequest'
             };
 
-            // Add Authorization header if not demo mode
-            if (!authService.isDemoMode()) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-
             const response = await fetch(`/api/notifications/${id}`, {
                 method: 'DELETE',
                 headers,
-                credentials: 'include'
+                credentials: 'include',
+                body: JSON.stringify({
+                    user_id: user.id
+                })
             });
 
             console.log('🗑️ Delete response:', response.status, response.statusText);
@@ -358,13 +323,6 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 return;
             }
 
-            const token = authService.getToken();
-            if (!token) {
-                setError('Session expirée. Veuillez vous reconnecter.');
-                if (onAuthError) onAuthError();
-                return;
-            }
-
             console.log('🗑️ Clearing all notifications');
 
             const headers = {
@@ -373,15 +331,13 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 'X-Requested-With': 'XMLHttpRequest'
             };
 
-            // Add Authorization header if not demo mode
-            if (!authService.isDemoMode()) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-
             const response = await fetch('/api/notifications/clear-all', {
                 method: 'DELETE',
                 headers,
-                credentials: 'include'
+                credentials: 'include',
+                body: JSON.stringify({
+                    user_id: user.id
+                })
             });
 
             if (response.ok) {
@@ -423,13 +379,9 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
             const headers = {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'Authorization': `Bearer ${token}`
             };
-
-            // Add Authorization header if not demo mode
-            if (!authService.isDemoMode()) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
 
             const response = await fetch('/api/notifications/mark-all-read', {
                 method: 'POST',
@@ -447,9 +399,15 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 );
                 setUnreadCount(0);
                 console.log('✅ All notifications marked as read');
-            } else if (response.status === 401) {
-                if (onAuthError) onAuthError();
-                setError('Session expirée. Veuillez vous reconnecter.');
+                
+                // Force refresh notifications from server to ensure consistency
+                setTimeout(() => {
+                    fetchNotifications();
+                }, 500);
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Mark all as read failed:', response.status, errorData);
+                setError(`Erreur: ${errorData.message || 'Impossible de marquer comme lu'}`);
             }
         } catch (err) {
             console.error('Error marking all notifications as read:', err);
@@ -478,15 +436,17 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
         <>
             <header style={{
                 backgroundColor: darkTheme ? '#1f2937' : 'white',
-                padding: '20px 32px',
+                padding: '16px 32px',
                 borderBottom: `1px solid ${darkTheme ? '#374151' : '#e2e8f0'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 boxShadow: darkTheme ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.05)',
                 transition: 'all 0.3s ease',
-                position: 'relative',
-                zIndex: 1000
+                position: 'sticky',
+                top: 0,
+                zIndex: 999,
+                height: '64px'
             }}>
                 <div style={{
                     display: 'flex',
@@ -516,6 +476,9 @@ const Header = ({ user, darkTheme = false, onAuthError = null }) => {
                 </div>
 
                 <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+                    {/* Password Expiry Timer */}
+                    <PasswordExpiryTimer user={user} />
+                    
                     {/* Notification Bell */}
                     <div style={{ position: 'relative' }}>
                         <button

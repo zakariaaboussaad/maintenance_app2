@@ -301,12 +301,15 @@ const TicketCreationForm = ({ equipment, onClose, onTicketCreated }) => {
                                 style={{
                                     width: '100%',
                                     minHeight: '120px',
+                                    maxHeight: '200px',
                                     padding: '12px',
                                     border: '1px solid #d1d5db',
                                     borderRadius: '8px',
                                     fontSize: '14px',
                                     fontFamily: 'inherit',
-                                    resize: 'vertical'
+                                    resize: 'vertical',
+                                    boxSizing: 'border-box',
+                                    overflow: 'auto'
                                 }}
                                 maxLength={500}
                             />
@@ -447,7 +450,13 @@ const TicketCreationForm = ({ equipment, onClose, onTicketCreated }) => {
                                         borderRadius: '8px',
                                         fontSize: '14px',
                                         color: '#374151',
-                                        lineHeight: '1.5'
+                                        lineHeight: '1.5',
+                                        wordWrap: 'break-word',
+                                        whiteSpace: 'pre-wrap',
+                                        overflowWrap: 'break-word',
+                                        wordBreak: 'break-word',
+                                        maxWidth: '100%',
+                                        overflow: 'hidden'
                                     }}>
                                         {formData.description}
                                     </div>
@@ -472,7 +481,13 @@ const TicketCreationForm = ({ equipment, onClose, onTicketCreated }) => {
                                         fontSize: '14px',
                                         color: '#374151',
                                         lineHeight: '1.5',
-                                        fontStyle: 'italic'
+                                        fontStyle: 'italic',
+                                        wordWrap: 'break-word',
+                                        whiteSpace: 'pre-wrap',
+                                        overflowWrap: 'break-word',
+                                        wordBreak: 'break-word',
+                                        maxWidth: '100%',
+                                        overflow: 'hidden'
                                     }}>
                                         {formData.comment}
                                     </div>

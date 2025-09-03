@@ -67,14 +67,15 @@ const Sidebar = ({
 
     const getMenuItems = () => {
         console.log('Getting menu items for userRole:', userRole);
-        if (userRole === 'technician') {
+        // Handle both numeric and string role IDs
+        if (userRole === 2 || userRole === 'technician') {
             return [
                 { id: 'home', label: 'Home', icon: Home },
                 { id: 'tickets', label: 'Liste des Tickets', icon: CheckCircle },
-                { id: 'equipements', label: 'Équipements', icon: Monitor },
+                
                 { id: 'my-tickets', label: 'Vos Tickets', icon: Wrench }
             ];
-        } else if (userRole === 'admin') {
+        } else if (userRole === 1 || userRole === 'admin') {
             return [
                 { id: 'home', label: 'Dashboard', icon: Home },
                 { id: 'tickets', label: 'Tickets', icon: CheckCircle },
@@ -84,12 +85,13 @@ const Sidebar = ({
                 { id: 'user-history', label: 'Historique Utilisateur', icon: User },
                 { id: 'equipment-history', label: 'Historique Équipement', icon: Computer },
                 { id: 'excel-reports', label: 'Rapports Excel', icon: FileSpreadsheet },
-                
+                { id: 'default-passwords', label: 'Mots de Passe par Défaut', icon: Key },
             ];
         } else {
+            // Normal users (role_id = 3 or other)
             return [
                 { id: 'home', label: 'Home', icon: Home },
-                { id: 'tickets', label: 'Tickets', icon: Users }
+                { id: 'tickets', label: 'Tickets', icon: CheckCircle }
             ];
         }
     };
@@ -98,17 +100,20 @@ const Sidebar = ({
 
     return (
         <nav style={{
-            width: sidebarCollapsed ? '80px' : '240px',
+            width: sidebarCollapsed ? '80px' : '280px',
             backgroundColor: darkTheme ? '#1f2937' : '#ffffff',
             padding: '0',
-            minHeight: '100vh',
+            height: '100vh',
             fontFamily: 'system-ui, -apple-system, sans-serif',
-            position: 'relative',
+            position: 'fixed',
+            top: 0,
+            left: 0,
             display: 'flex',
             flexDirection: 'column',
             transition: 'all 0.3s ease',
             borderRight: `1px solid ${darkTheme ? '#374151' : '#e2e8f0'}`,
-            overflow: 'hidden'
+            overflow: 'hidden',
+            zIndex: 1000
         }}>
             {/* Logo Section */}
             <div style={{

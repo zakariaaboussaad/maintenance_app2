@@ -23,8 +23,8 @@ const TechnicianDashboard = ({ onLogout, user }) => {
 
   // Apply theme to document body
   useEffect(() => {
-    document.body.style.backgroundColor = darkTheme ? '#111827' : '#f8fafc';
-    document.body.style.color = darkTheme ? '#ffffff' : '#000000';
+    document.body.style.backgroundColor = darkTheme ? '#111827' : '';
+    document.body.style.color = darkTheme ? '#ffffff' : '';
     return () => {
       document.body.style.backgroundColor = '';
       document.body.style.color = '';
@@ -40,7 +40,7 @@ const TechnicianDashboard = ({ onLogout, user }) => {
       case 'my-tickets':
         return <TechnicianMyTicketsPage user={user} darkTheme={darkTheme} />;
       case 'settings':
-        return <UserSettingsPage user={user} darkTheme={darkTheme} />;
+        return <UserSettingsPage user={user} darkTheme={darkTheme} setDarkTheme={setDarkTheme} />;
       case 'equipements':
         return (
           <div style={{
@@ -89,7 +89,7 @@ const TechnicianDashboard = ({ onLogout, user }) => {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: darkTheme ? '#111827' : '#f8fafc',
+      backgroundColor: darkTheme ? '#111827' : '',
       display: 'flex',
       flexDirection: 'row',
       transition: 'background-color 0.3s ease'
@@ -108,16 +108,25 @@ const TechnicianDashboard = ({ onLogout, user }) => {
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100vh'
+        minHeight: '100vh',
+        marginLeft: sidebarCollapsed ? '80px' : '280px',
+        transition: 'margin-left 0.3s ease'
       }}>
-        <Header user={user} darkTheme={darkTheme} />
+        <Header
+          user={user}
+          onLogout={onLogout}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          userId={user?.id_user || user?.id}
+          darkTheme={darkTheme}
+        />
 
         <main style={{
           padding: '40px',
           flex: 1,
           fontFamily: 'system-ui, -apple-system, sans-serif',
           overflow: 'auto',
-          minHeight: 'calc(100vh - 80px)'
+          minHeight: 'calc(100vh - 64px)'
         }}>
           {renderPageContent()}
         </main>

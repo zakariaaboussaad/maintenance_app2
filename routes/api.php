@@ -49,6 +49,9 @@ Route::get('/debug/db', function () {
     }
 });
 
+
+
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -58,27 +61,41 @@ Route::get('/debug/db', function () {
 // Authentication routes
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/login', [AuthController::class, 'login']); // Keep both for compatibility
+
+// Forgot password routes (no auth required)
+Route::post('/forgot-password/verify', [App\Http\Controllers\DefaultPasswordController::class, 'verifyForgotPassword']);
+Route::post('/forgot-password/reset', [App\Http\Controllers\DefaultPasswordController::class, 'resetPassword']);
+
+// Default password management routes (Admin only)
+Route::get('/admin/default-password/info', [App\Http\Controllers\DefaultPasswordController::class, 'getInfo']);
+Route::post('/admin/default-password/set', [App\Http\Controllers\DefaultPasswordController::class, 'setDefaultPassword']);
+Route::delete('/admin/default-password/remove', [App\Http\Controllers\DefaultPasswordController::class, 'removeDefaultPassword']);
+Route::post('/reset-password-forced', [App\Http\Controllers\DefaultPasswordController::class, 'forcePasswordReset']);
+Route::get('/user/password-expiry-status', [App\Http\Controllers\DefaultPasswordController::class, 'getPasswordExpiryStatus']);
+Route::get('/admin/users', [UsersController::class, 'index']);
+// Notification routes (session-based auth)
+Route::get('/notifications', [NotificationController::class, 'index']);
+Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
+Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+Route::get('/notifications/{id}', [NotificationController::class, 'show']);
+Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+Route::delete('/notifications/clear-all', [NotificationController::class, 'clearAll']);
+Route::post('/notifications/test', [NotificationController::class, 'sendTestNotification']);
+
+// Auth routes (session-based auth)
+Route::get('/auth/me', [AuthController::class, 'me']);
+Route::get('/user', [AuthController::class, 'me']);
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/auth/me', [AuthController::class, 'me']);
-    Route::get('/user', [AuthController::class, 'me']);
 
-    // Notifications routes (authenticated)
-    Route::get('/notifications', [NotificationController::class, 'getUserNotifications']);
-    Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
-    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
-    Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
-    
-    // Debug route for mark as read
-    Route::put('/notifications/{id}/read-debug', function($id) {
-        \Log::info('DEBUG: Mark as read route hit', ['id' => $id]);
-        return response()->json(['debug' => 'route hit', 'id' => $id]);
-    });
-    Route::get('/notifications/{id}', [NotificationController::class, 'show']);
-    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
-    Route::delete('/notifications/clear-all', [NotificationController::class, 'clearAll']);
-    Route::post('/notifications/test', [NotificationController::class, 'sendTestNotification']);
+    // Default password system routes (Admin only)
+    Route::get('/default-password/status', [App\Http\Controllers\Api\DefaultPasswordSystemController::class, 'getStatus']);
+    Route::get('/default-password/history', [App\Http\Controllers\Api\DefaultPasswordSystemController::class, 'getHistory']);
+    Route::post('/default-password/set', [App\Http\Controllers\Api\DefaultPasswordSystemController::class, 'setPassword']);
+    Route::post('/default-password/generate', [App\Http\Controllers\Api\DefaultPasswordSystemController::class, 'generatePassword']);
 });
 
 // Test Sanctum token creation
@@ -208,7 +225,7 @@ Route::get('/test-notification-service', function () {
 });
 
 // Test authentication in API requests
-Route::middleware('auth:sanctum')->get('/test-auth', function (\Illuminate\Http\Request $request) {
+Route::get('/test-auth', function (\Illuminate\Http\Request $request) {
     try {
         $authUser = auth()->user();
         $sanctumUser = auth('sanctum')->user();
@@ -650,6 +667,9 @@ Route::middleware(['api'])->group(function () {
        Route::get('/utilisateurs/{id}', [UsersController::class, 'show']);
        Route::put('/utilisateurs/{id}', [UsersController::class, 'update']);
        Route::delete('/utilisateurs/{id}', [UsersController::class, 'destroy']);
+       
+    // User password change (with current password) - moved here to match profile update middleware
+    Route::post('/change-password', [App\Http\Controllers\PasswordResetController::class, 'changePassword']);
 
     // Pannes routes
     Route::get('/pannes', [PanneController::class, 'index']);
@@ -672,6 +692,7 @@ Route::middleware(['api'])->group(function () {
     Route::get('/interventions', [InterventionController::class, 'index']);
     Route::get('/interventions/{id}', [InterventionController::class, 'show']);
 
+    // Removed duplicate history routes - proper ones are defined later in the file
 
     Route::get('/utilisateurs', [UsersController::class, 'index']);
     Route::post('/utilisateurs', [UsersController::class, 'store']); // Créer un utilisateur
@@ -780,8 +801,19 @@ Route::get('/create-test-data', function () {
     }
 });
 
-// Password request routes
-Route::middleware('auth:sanctum')->group(function () {
+// Password management routes
+Route::post('/password-reset/request', [App\Http\Controllers\PasswordResetController::class, 'requestReset']);
+
+Route::middleware('web')->group(function () {
+    // Password reset management (admin only)
+    Route::get('/password-reset-requests', [App\Http\Controllers\PasswordResetController::class, 'getRequests']);
+    Route::get('/password-resets', [App\Http\Controllers\PasswordResetController::class, 'getRequests']);
+    Route::post('/password-reset-requests/{id}/approve', [App\Http\Controllers\PasswordResetController::class, 'approveRequest']);
+    Route::post('/password-reset-requests/{id}/reject', [App\Http\Controllers\PasswordResetController::class, 'rejectRequest']);
+    Route::post('/password-resets/{id}/approve', [App\Http\Controllers\PasswordResetController::class, 'approveRequest']);
+    Route::post('/password-resets/{id}/reject', [App\Http\Controllers\PasswordResetController::class, 'rejectRequest']);
+    
+    // Legacy password request routes (to be removed)
     Route::post('/password-requests', [App\Http\Controllers\Api\PasswordRequestController::class, 'createRequest']);
     Route::get('/password-requests', [App\Http\Controllers\Api\PasswordRequestController::class, 'getRequests']);
     Route::post('/password-requests/{id}/approve', [App\Http\Controllers\Api\PasswordRequestController::class, 'approveRequest']);

@@ -1,13 +1,28 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-
+use Illuminate\Support\Facades\DB;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
 |--------------------------------------------------------------------------
 */
-
+Route::get('/test-db', function () {
+    try {
+        $users = DB::select('SELECT * FROM users LIMIT 1');
+        return response()->json([
+            'status' => 'success', 
+            'message' => 'Database connected',
+            'user_count' => count($users),
+            'sample_user' => $users[0] ?? null
+        ]);
+    } catch (Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage()
+        ], 500);
+    }
+});
 // Main application routes
 Route::get('/', function () {
     return view('dashboard');

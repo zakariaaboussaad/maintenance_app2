@@ -41,6 +41,8 @@ class Notification extends Model
         'data'
     ];
 
+    protected $table = 'notifications';
+
     /**
      * Get the attributes that should be cast.
      *
@@ -194,6 +196,8 @@ class Notification extends Model
             'titre' => $titre,
             'message' => $message,
             'data' => $data,
+            'date_creation' => now(),
+            'lu' => false,
         ]);
     }
 

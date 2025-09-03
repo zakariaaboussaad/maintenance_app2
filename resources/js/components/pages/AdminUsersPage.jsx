@@ -9,6 +9,10 @@ const AdminUsersPage = () => {
   const [query, setQuery] = useState('');
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // Page and Modal states
   const [showAddPage, setShowAddPage] = useState(false);
@@ -45,7 +49,7 @@ const AdminUsersPage = () => {
       const res = await response.json();
 
       if (res.success) {
-        setAllUsers(res.data);
+        setAllUsers(res.users || res.data || []);
       } else {
         setError(res.message || 'Erreur lors du chargement');
       }
@@ -58,6 +62,10 @@ const AdminUsersPage = () => {
   };
 
   const applyFilters = () => {
+    if (!Array.isArray(allUsers)) {
+      setFilteredUsers([]);
+      return;
+    }
     let list = [...allUsers];
     if (query) {
       const q = query.toLowerCase();
@@ -71,6 +79,26 @@ const AdminUsersPage = () => {
       list = list.filter(u => Boolean(u.is_active) === isActive);
     }
     setUsers(list);
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  // Pagination logic
+  const totalPages = Math.ceil(users.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentUsers = users.slice(startIndex, endIndex);
+  const showPagination = users.length > itemsPerPage;
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
   const openAddPage = () => {
@@ -299,10 +327,10 @@ const AdminUsersPage = () => {
     }
 
     return (
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: '32px' }}>
         <label style={{
           display: 'block',
-          marginBottom: 8,
+          marginBottom: '8px',
           fontWeight: 600,
           color: hasError ? '#dc2626' : '#374151'
         }}>
@@ -394,19 +422,7 @@ const AdminUsersPage = () => {
               Modifier le profile de {selectedUser?.prenom || 'Utilisateur'}
             </h1>
           </div>
-          <button
-            onClick={() => setShowEditPage(false)}
-            style={{
-              padding: '8px 16px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 0,
-              borderRadius: 8,
-              cursor: 'pointer'
-            }}
-          >
-            Revenir
-          </button>
+          
         </div>
 
         {error && (
@@ -455,29 +471,28 @@ const AdminUsersPage = () => {
 
 
           {/* Form Fields */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, maxWidth: 800, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', maxWidth: '800px', margin: '0 auto' }}>
             <div>
               {renderFormField('Prénom *', 'prenom', 'text', null, 'Entrer le prénom')}
               {renderFormField('Email *', 'email', 'email', null, 'Entrer l\'adresse email')}
               {renderFormField('Mot de passe', 'password', 'password', null, 'Laisser vide pour ne pas changer')}
-              {renderFormField('Matricule', 'matricule', 'text', null, 'Entrer le matricule')}
-              {renderFormField('Gender *', 'gender', 'select', [
-  { value: '', label: 'Sélectionner le genre' },
-  { value: 'male', label: 'Homme' },      // OLD - doesn't match database
-  { value: 'female', label: 'Femme' }     // OLD - doesn't match database
-])}
-
-            </div>
-            <div>
-              {renderFormField('Nom *', 'nom', 'text', null, 'Entrer le nom')}
-              {renderFormField('Numéro de téléphone', 'numero_telephone', 'tel', null, 'Entrer le numéro de téléphone')}
-              {renderFormField('Poste affecté', 'poste_affecte', 'text', null, 'Entrer le poste')}
               {renderFormField('Role *', 'role_id', 'select', [
                 { value: '', label: 'Sélectionner un rôle' },
                 { value: '1', label: 'Admin' },
                 { value: '2', label: 'Technicien' },
                 { value: '3', label: 'Utilisateur' }
               ])}
+              {renderFormField('Gender *', 'gender', 'select', [
+                { value: '', label: 'Sélectionner le genre' },
+                { value: 'male', label: 'Homme' },
+                { value: 'female', label: 'Femme' }
+              ])}
+            </div>
+            <div>
+              {renderFormField('Nom *', 'nom', 'text', null, 'Entrer le nom')}
+              {renderFormField('Numéro de téléphone', 'numero_telephone', 'tel', null, 'Entrer le numéro de téléphone')}
+              {renderFormField('Poste affecté', 'poste_affecte', 'text', null, 'Entrer le poste')}
+              {renderFormField('Matricule', 'matricule', 'text', null, 'Entrer le matricule')}
             </div>
           </div>
 
@@ -530,19 +545,7 @@ const AdminUsersPage = () => {
             </button>
             <h1 style={{ fontSize: 32, fontWeight: 800, color: '#1e293b', margin: 0 }}>Ajouter un utilisateur</h1>
           </div>
-          <button
-            onClick={() => setShowAddPage(false)}
-            style={{
-              padding: '8px 16px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 0,
-              borderRadius: 8,
-              cursor: 'pointer'
-            }}
-          >
-            Revenir
-          </button>
+          
         </div>
 
         {error && (
@@ -589,7 +592,7 @@ const AdminUsersPage = () => {
           </div>
 
           {/* Form Fields */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, maxWidth: 800, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', maxWidth: '800px', margin: '0 auto' }}>
             <div>
               {renderFormField('Prénom *', 'prenom', 'text', null, 'Entrer le prénom')}
               {renderFormField('Email *', 'email', 'email', null, 'Entrer l\'adresse email')}
@@ -678,7 +681,12 @@ const AdminUsersPage = () => {
           <option value="active">Actif</option>
           <option value="inactive">Inactif</option>
         </select>
-        <button onClick={() => { setQuery(''); setRole(''); setStatus(''); }} style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 0, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+        <button onClick={() => {
+          setQuery('');
+          setRole('');
+          setStatus('');
+          setCurrentPage(1);
+        }} style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 0, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
           <RefreshCw size={16} /> Reset Filter
         </button>
         <button onClick={openAddPage} style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 0, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', cursor: 'pointer' }}>
@@ -702,8 +710,8 @@ const AdminUsersPage = () => {
               Aucun utilisateur trouvé
             </div>
           ) : (
-            users.map((u, index) => (
-              <div key={u.id_user || u.id} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 120px 120px 120px 100px', padding: '20px 24px', borderBottom: index < users.length - 1 ? '1px solid #f1f5f9' : 'none', alignItems: 'center' }}>
+            currentUsers.map((u, index) => (
+              <div key={u.id_user || u.id} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 120px 120px 120px 100px', padding: '20px 24px', borderBottom: index < currentUsers.length - 1 ? '1px solid #f1f5f9' : 'none', alignItems: 'center' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#6b7280' }}>{String(u.id_user || u.id).padStart(5, '0')}</div>
                 <div>{u.prenom ? `${u.prenom} ${u.nom}` : (u.name || '—')}</div>
                 <div>{u.email || '—'}</div>
@@ -762,6 +770,61 @@ const AdminUsersPage = () => {
             ))
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {showPagination && (
+          <div style={{
+            padding: '20px 24px',
+            borderTop: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#f8fafc'
+          }}>
+            <div style={{fontSize: '14px', color: '#6b7280'}}>
+              Showing {startIndex + 1}-{Math.min(endIndex, users.length)} of {users.length}
+            </div>
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center'
+            }}>
+              <button
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  color: currentPage === 1 ? '#9ca3af' : '#374151'
+                }}
+              >
+                &lt;
+              </button>
+              <span style={{fontSize: '14px', color: '#374151', padding: '0 8px'}}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  color: currentPage === totalPages ? '#9ca3af' : '#374151'
+                }}
+              >
+                &gt;
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}

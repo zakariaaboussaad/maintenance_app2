@@ -30,13 +30,18 @@ class NotificationService
                 'action' => 'ticket_taken'
             ];
 
-            return Notification::createForUser(
-                $ticket->user_id,
-                Notification::TYPE_TICKET_ASSIGNED,
-                $titre,
-                $message,
-                $data
-            );
+            $notification = Notification::create([
+                'user_id' => $ticket->user_id,
+                'type' => Notification::TYPE_TICKET_ASSIGNED,
+                'titre' => $titre,
+                'message' => $message,
+                'data' => json_encode($data),
+                'ticket_id' => $ticket->id,
+                'date_creation' => now(),
+                'lu' => false,
+            ]);
+
+            return $notification;
             
         } catch (\Exception $e) {
             Log::error('Error sending ticket taken notification: ' . $e->getMessage());
@@ -118,13 +123,16 @@ class NotificationService
                 'message' => substr($message, 0, 100) . '...'
             ]);
 
-            $notification = Notification::createForUser(
-                $ticket->user_id,
-                $notificationType,
-                $titre,
-                $message,
-                $data
-            );
+            $notification = Notification::create([
+                'user_id' => $ticket->user_id,
+                'type' => $notificationType,
+                'titre' => $titre,
+                'message' => $message,
+                'data' => json_encode($data),
+                'ticket_id' => $ticket->id,
+                'date_creation' => now(),
+                'lu' => false,
+            ]);
             
             Log::info('Notification created successfully', [
                 'notification_id' => $notification->id ?? 'unknown',
@@ -170,6 +178,13 @@ class NotificationService
                 return false;
             }
 
+            // Verify ticket owner exists
+            $ticketOwner = User::find($ticket->user_id);
+            if (!$ticketOwner) {
+                Log::error('SKIPPING COMMENT NOTIFICATION: Ticket owner not found with ID: ' . $ticket->user_id);
+                return false;
+            }
+
             Log::info('PROCEEDING: Different users - notification should be sent');
 
             $titre = "Nouveau commentaire sur votre ticket";
@@ -184,17 +199,42 @@ class NotificationService
                 'action' => 'comment_added'
             ];
 
-            $notification = Notification::createForUser(
-                $ticket->user_id,
-                Notification::TYPE_COMMENT_ADDED,
-                $titre,
-                $message,
-                $data
-            );
+            Log::info('Creating comment notification with data:', [
+                'user_id' => $ticket->user_id,
+                'type' => Notification::TYPE_COMMENT_ADDED,
+                'titre' => $titre,
+                'ticket_id' => $ticket->id,
+                'ticket_object_id' => $ticket->id ?? 'null'
+            ]);
+
+            $notification = Notification::create([
+                'user_id' => $ticket->user_id,
+                'type' => Notification::TYPE_COMMENT_ADDED,
+                'titre' => $titre,
+                'message' => $message,
+                'data' => json_encode($data),
+                'ticket_id' => $ticket->id,
+                'date_creation' => now(),
+                'lu' => false,
+            ]);
             
             Log::info('Comment notification creation result: ' . ($notification ? 'SUCCESS' : 'FAILED'));
             if ($notification) {
-                Log::info('Created notification ID: ' . $notification->id . ' for user: ' . $notification->user_id);
+                Log::info('Created comment notification ID: ' . $notification->id . ' for user: ' . $notification->user_id);
+                Log::info('Notification details: type=' . $notification->type . ', ticket_id=' . $notification->ticket_id);
+                
+                // Verify the ticket_id was actually saved
+                $savedNotification = Notification::find($notification->id);
+                if ($savedNotification) {
+                    Log::info('VERIFICATION: Saved notification ticket_id=' . ($savedNotification->ticket_id ?? 'NULL'));
+                    if (!$savedNotification->ticket_id) {
+                        Log::error('CRITICAL: ticket_id is NULL in saved notification despite being set during creation!');
+                    }
+                } else {
+                    Log::error('CRITICAL: Could not retrieve saved notification for verification');
+                }
+            } else {
+                Log::error('FAILED to create comment notification - database error or constraint violation');
             }
             
             return $notification;
@@ -229,13 +269,16 @@ class NotificationService
                 'action' => 'ticket_assigned'
             ];
 
-            return Notification::createForUser(
-                $technician->id_user,
-                Notification::TYPE_TICKET_ASSIGNED,
-                $titre,
-                $message,
-                $data
-            );
+            return Notification::create([
+                'user_id' => $technician->id_user,
+                'type' => Notification::TYPE_TICKET_ASSIGNED,
+                'titre' => $titre,
+                'message' => $message,
+                'data' => json_encode($data),
+                'ticket_id' => $ticket->id,
+                'date_creation' => now(),
+                'lu' => false,
+            ]);
             
         } catch (\Exception $e) {
             Log::error('Error sending ticket assigned notification: ' . $e->getMessage());
@@ -272,13 +315,18 @@ class NotificationService
 
             $adminIds = $admins->pluck('id_user')->toArray();
             
-            Notification::createForUsers(
-                $adminIds,
-                Notification::TYPE_TICKET_NEW,
-                $titre,
-                $message,
-                $data
-            );
+            foreach ($adminIds as $adminId) {
+                Notification::create([
+                    'user_id' => $adminId,
+                    'type' => Notification::TYPE_TICKET_NEW,
+                    'titre' => $titre,
+                    'message' => $message,
+                    'data' => json_encode($data),
+                    'ticket_id' => $ticket->id,
+                    'date_creation' => now(),
+                    'lu' => false,
+                ]);
+            }
 
             return count($adminIds);
             
@@ -352,6 +400,49 @@ class NotificationService
     }
 
     /**
+     * Notify admins when a user requests password reset (forgot password)
+     */
+    public static function notifyPasswordResetRequest($passwordReset, $user)
+    {
+        try {
+            // Get all admin users (role_id = 1)
+            $admins = User::where('role_id', 1)->get();
+
+            if ($admins->isEmpty()) {
+                return false;
+            }
+
+            $titre = "Demande de réinitialisation de mot de passe";
+            $message = "{$user->nom} {$user->prenom} ({$user->email}) a demandé une réinitialisation de mot de passe.";
+            
+            $data = [
+                'password_reset_id' => $passwordReset->id,
+                'user_id' => $user->id_user ?? $user->id,
+                'user_name' => $user->nom . ' ' . $user->prenom,
+                'user_email' => $user->email,
+                'requested_at' => $passwordReset->created_at->format('Y-m-d H:i:s'),
+                'action' => 'password_reset_request'
+            ];
+
+            $adminIds = $admins->pluck('id_user')->toArray();
+            
+            Notification::createForUsers(
+                $adminIds,
+                'password_reset_request',
+                $titre,
+                $message,
+                $data
+            );
+
+            return count($adminIds);
+            
+        } catch (\Exception $e) {
+            Log::error('Error sending password reset request notification: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Notify admins when a user requests password change
      */
     public static function notifyPasswordChangeRequest($passwordRequest, $user)
@@ -391,6 +482,128 @@ class NotificationService
             
         } catch (\Exception $e) {
             Log::error('Error sending password change request notification: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Notify user when password reset is approved by admin
+     */
+    public static function notifyPasswordResetApproved($passwordReset, $admin, $newPassword)
+    {
+        try {
+            // Find user by email since PasswordReset doesn't have user_id
+            $user = User::where('email', $passwordReset->email)->first();
+            
+            if (!$user) {
+                Log::error('User not found for password reset notification', ['email' => $passwordReset->email]);
+                return false;
+            }
+            
+            // Send EMAIL notification (primary method since user can't access app without password)
+            try {
+                \Mail::to($user->email)->send(new \App\Mail\PasswordResetApproved(
+                    $user->nom . ' ' . $user->prenom,
+                    $newPassword,
+                    $admin->nom . ' ' . $admin->prenom
+                ));
+                \Log::info('Password reset email sent successfully', [
+                    'email' => $user->email,
+                    'user_id' => $user->id_user,
+                    'password_reset_id' => $passwordReset->id,
+                    'mail_driver' => config('mail.default')
+                ]);
+            } catch (\Exception $emailError) {
+                \Log::error('Failed to send password reset email: ' . $emailError->getMessage(), [
+                    'email' => $user->email,
+                    'error_trace' => $emailError->getTraceAsString()
+                ]);
+            }
+            
+            // Also create in-app notification as backup
+            $titre = "Votre mot de passe a été réinitialisé";
+            $message = "Votre demande de réinitialisation de mot de passe a été approuvée par {$admin->nom} {$admin->prenom}. Votre nouveau mot de passe temporaire: {$newPassword}";
+            
+            $data = [
+                'password_reset_id' => $passwordReset->id,
+                'new_password' => $newPassword,
+                'admin_name' => $admin->nom . ' ' . $admin->prenom,
+                'approved_at' => now()->format('Y-m-d H:i:s'),
+                'action' => 'password_reset_approved',
+                'one_time_view' => true
+            ];
+
+            Log::info('Creating password reset notification', [
+                'user_id' => $user->id_user,
+                'user_email' => $user->email,
+                'password_reset_id' => $passwordReset->id
+            ]);
+
+            return Notification::createForUser(
+                $user->id_user,
+                'password_reset_approved',
+                $titre,
+                $message,
+                $data
+            );
+            
+        } catch (\Exception $e) {
+            Log::error('Error sending password reset approved notification: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Notify user when password reset is rejected by admin
+     */
+    public static function notifyPasswordResetRejected($passwordReset, $admin, $rejectionReason = null)
+    {
+        try {
+            // Find user by email since PasswordReset doesn't have user_id
+            $user = User::where('email', $passwordReset->email)->first();
+            
+            if (!$user) {
+                Log::error('User not found for password reset rejection notification', ['email' => $passwordReset->email]);
+                return false;
+            }
+            
+            // Send EMAIL notification (primary method)
+            try {
+                \Mail::to($user->email)->send(new \App\Mail\PasswordResetRejected(
+                    $user->nom . ' ' . $user->prenom,
+                    $rejectionReason,
+                    $admin->nom . ' ' . $admin->prenom
+                ));
+                Log::info('Password reset rejection email sent successfully', ['email' => $user->email]);
+            } catch (\Exception $emailError) {
+                Log::error('Failed to send password reset rejection email: ' . $emailError->getMessage());
+            }
+            
+            // Also create in-app notification as backup
+            $titre = "Demande de réinitialisation de mot de passe rejetée";
+            $message = "Votre demande de réinitialisation de mot de passe a été rejetée par {$admin->nom} {$admin->prenom}.";
+            if ($rejectionReason) {
+                $message .= " Raison: {$rejectionReason}";
+            }
+            
+            $data = [
+                'password_reset_id' => $passwordReset->id,
+                'rejection_reason' => $rejectionReason,
+                'admin_name' => $admin->nom . ' ' . $admin->prenom,
+                'rejected_at' => now()->format('Y-m-d H:i:s'),
+                'action' => 'password_reset_rejected'
+            ];
+
+            return Notification::createForUser(
+                $user->id_user,
+                'password_reset_rejected',
+                $titre,
+                $message,
+                $data
+            );
+            
+        } catch (\Exception $e) {
+            Log::error('Error sending password reset rejected notification: ' . $e->getMessage());
             return false;
         }
     }

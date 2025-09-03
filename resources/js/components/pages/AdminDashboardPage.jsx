@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Ticket, CheckCircle, Clock, TrendingUp, Activity, AlertTriangle, Wrench, FileText } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
+import { Users, Ticket, CheckCircle, Clock, TrendingUp, Activity, AlertTriangle, Wrench, FileText, BarChart3, Filter, Calendar, User } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 
-const AdminDashboardPage = ({ user }) => {
+const AdminDashboardPage = ({ user, onNavigateToPage }) => {
 console.log('AdminDashboardPage rendering with user:', user);
 const [stats, setStats] = useState({
 totalUsers: 0,
@@ -19,8 +19,15 @@ totalFailures: 0
 
 const [chartData, setChartData] = useState([]);
 const [ticketsByStatus, setTicketsByStatus] = useState([]);
+const [pyramidData, setPyramidData] = useState([]);
+const [originalTickets, setOriginalTickets] = useState([]); // Store original tickets for filtering
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState(null);
+const [viewMode, setViewMode] = useState('line'); // 'line' or 'pyramid'
+const [filterMonth, setFilterMonth] = useState('');
+const [filterYear, setFilterYear] = useState('');
+const [filterTech, setFilterTech] = useState('');
+const [technicians, setTechnicians] = useState([]);
 
 // API base URL - adjust this to match your Laravel API
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -42,7 +49,7 @@ try {
   };
 
   // Fetch all data concurrently with proper error handling
-  const [usersResponse, ticketsResponse, equipmentsResponse, failuresResponse] = await Promise.all([
+  const [usersResponse, ticketsResponse, equipmentsResponse, failuresResponse, techsResponse] = await Promise.all([
     fetch(`${API_BASE_URL}/utilisateurs`, { headers }).catch(err => {
       console.error('Users fetch error:', err);
       return { ok: false, error: err.message };
@@ -58,6 +65,10 @@ try {
     fetch(`${API_BASE_URL}/pannes`, { headers }).catch(err => {
       console.error('Pannes fetch error:', err);
       return { ok: false, error: err.message };
+    }),
+    fetch(`${API_BASE_URL}/utilisateurs`, { headers }).catch(err => {
+      console.error('Technicians fetch error:', err);
+      return { ok: false, error: err.message };
     })
   ]);
 
@@ -66,6 +77,7 @@ try {
   let ticketsData = { data: [], count: 0 };
   let equipmentsData = { data: [], count: 0 };
   let failuresData = { data: [], count: 0 };
+  let techsData = { data: [], count: 0 };
 
   if (usersResponse.ok) {
     usersData = await usersResponse.json();
@@ -95,14 +107,38 @@ try {
     console.error('Pannes API failed:', failuresResponse.status, failuresResponse.statusText);
   }
 
+  if (techsResponse.ok) {
+    techsData = await techsResponse.json();
+    console.log('Technicians data:', techsData);
+  } else {
+    console.error('Technicians API failed:', techsResponse.status, techsResponse.statusText);
+  }
+
   // Process tickets data
   const tickets = ticketsData.data || ticketsData || [];
+  
+  // Log all unique statuses to see what we're working with
+  const uniqueStatuses = [...new Set(tickets.map(t => t.status))];
+  console.log('Unique ticket statuses found:', uniqueStatuses);
+  
   const ticketStats = {
     total: tickets.length,
-    closed: tickets.filter(t => ['resolu', 'ferme'].includes(t.status)).length,
-    open: tickets.filter(t => t.status === 'ouvert').length,
-    inProgress: tickets.filter(t => t.status === 'en_cours').length,
-    pending: tickets.filter(t => t.status === 'en_attente').length
+    closed: tickets.filter(t => {
+      const status = t.status?.toLowerCase();
+      return status === 'résolu' || status === 'resolu' || status === 'resolved';
+    }).length,
+    open: tickets.filter(t => {
+      const status = t.status?.toLowerCase();
+      return status === 'fermé' || status === 'ferme' || status === 'closed';
+    }).length,
+    inProgress: tickets.filter(t => {
+      const status = t.status?.toLowerCase();
+      return status === 'en cours' || status === 'en_cours' || status === 'in_progress';
+    }).length,
+    pending: tickets.filter(t => {
+      const status = t.status?.toLowerCase();
+      return status === 'en attente' || status === 'en_attente' || status === 'pending';
+    }).length
   };
 
   // Process equipment data - match your actual DB statuses
@@ -165,16 +201,34 @@ try {
     totalFailures: failureCount
   });
 
+  // Store original tickets for filtering
+  setOriginalTickets(tickets);
+  
   // Generate chart data from tickets (last 30 days)
   const chartData = generateTicketsChartData(tickets);
   setChartData(chartData);
+
+  // Set technicians for filter dropdown (include admins too)
+  const allUsers = techsData.users || techsData.data || [];
+  console.log('All users from API:', allUsers);
+  console.log('User roles found:', allUsers.map(u => ({ name: u.prenom + ' ' + u.nom, role_id: u.role_id })));
+  
+  const allTechs = allUsers.filter(u => u.role_id === 2 || u.role_id === 1); // Technicians and admins
+  console.log('Filtered technicians:', allTechs);
+  setTechnicians(allTechs);
+  
+  // Generate initial pyramid data
+  console.log('Generating pyramid data with tickets:', tickets.length, 'and techs:', allTechs.length);
+  const pyramidData = generatePyramidData(tickets, allTechs);
+  console.log('Generated pyramid data:', pyramidData);
+  setPyramidData(pyramidData);
 
   // Generate pie chart data for ticket status
   const statusData = [
     { name: 'Résolus', value: ticketStats.closed, color: '#10b981' },
     { name: 'En cours', value: ticketStats.inProgress, color: '#3b82f6' },
     { name: 'En attente', value: ticketStats.pending, color: '#f59e0b' },
-    { name: 'Ouverts', value: ticketStats.open, color: '#ef4444' }
+    { name: 'Fermés', value: ticketStats.open, color: '#ef4444' }
   ].filter(item => item.value > 0);
 
   setTicketsByStatus(statusData);
@@ -189,6 +243,15 @@ try {
 
 fetchDashboardData();
 }, []);
+
+// Regenerate pyramid data when data loads or filters change
+useEffect(() => {
+  if (technicians.length > 0 && originalTickets.length > 0) {
+    const ticketsToUse = getFilteredTickets();
+    const newPyramidData = generatePyramidData(ticketsToUse);
+    setPyramidData(newPyramidData);
+  }
+}, [filterMonth, filterYear, filterTech, originalTickets, technicians]);
 
 // Generate chart data from real tickets
 const generateTicketsChartData = (tickets) => {
@@ -228,7 +291,125 @@ last30Days.push({
 return last30Days;
 };
 
-const StatCard = ({ title, value, icon: Icon, bgColor, iconColor, textColor = '#1f2937', subtitle }) => (
+// Generate pyramid chart data from tickets
+const generatePyramidData = (tickets, techsList = technicians) => {
+  const pyramidData = [];
+  
+  // Filter only admins and technicians (role_id 1 or 2)
+  const techsAndAdmins = (techsList || []).filter(user => 
+    user.role_id === 1 || user.role_id === 2
+  );
+  
+  techsAndAdmins.forEach(tech => {
+    const techId = tech.id_user || tech.id;
+    const techName = `${tech.prenom} ${tech.nom}`;
+    
+    // Filter tickets assigned to this technician and resolved/closed
+    const techTickets = tickets.filter(ticket => {
+      const isAssignedToTech = ticket.technicien_assigne == techId;
+      const isResolved = ticket.status === 'resolu' || ticket.status === 'ferme' || ticket.status === 'en_cours';
+      return isAssignedToTech && isResolved;
+    });
+    
+    console.log(`Tech ${techName} (ID: ${techId}) has ${techTickets.length} tickets`);
+    
+    // Count tickets by category using categorie_id from database
+    let hardwareCount = 0;
+    let softwareCount = 0;
+    let networkCount = 0;
+    
+    techTickets.forEach(ticket => {
+      console.log(`Processing ticket:`, ticket.titre, `categorie_id:`, ticket.categorie_id);
+      
+      // Use categorie_id to properly categorize tickets
+      if (ticket.categorie_id === 1) { // Hardware
+        hardwareCount++;
+      } else if (ticket.categorie_id === 2) { // Software
+        softwareCount++;
+      } else if (ticket.categorie_id === 3) { // Network
+        networkCount++;
+      } else if (ticket.categorie_id === 4) { // Impression - count as hardware
+        hardwareCount++;
+      } else {
+        // Fallback: categorize by keywords if no categorie_id
+        const title = (ticket.titre || '').toLowerCase();
+        const description = (ticket.description || '').toLowerCase();
+        const content = `${title} ${description}`;
+        
+        console.log(`No categorie_id, using fallback for: "${content}"`);
+        
+        if (content.includes('ordinateur') || content.includes('pc') || 
+            content.includes('hardware') || content.includes('matériel')) {
+          hardwareCount++;
+          console.log('Categorized as HARDWARE');
+        } else if (content.includes('réseau') || content.includes('network')) {
+          networkCount++;
+          console.log('Categorized as NETWORK');
+        } else {
+          softwareCount++;
+          console.log('Categorized as SOFTWARE (default)');
+        }
+      }
+    });
+    
+    console.log(`${techName} final counts: Hardware=${hardwareCount}, Software=${softwareCount}, Network=${networkCount}`);
+    
+    // Add all admins and technicians with actual values
+    pyramidData.push({
+      technician: techName,
+      HARDWARE: hardwareCount,
+      SOFTWARE: softwareCount,
+      NETWORK: networkCount,
+      total: hardwareCount + softwareCount + networkCount,
+      techId: techId
+    });
+  });
+  
+  // Sort by total tickets resolved (descending)
+  return pyramidData.sort((a, b) => b.total - a.total);
+};
+
+// Filter tickets based on selected filters
+const getFilteredTickets = () => {
+  if (!filterYear && !filterMonth && !filterTech) {
+    return originalTickets;
+  }
+  
+  return originalTickets.filter(ticket => {
+    // Apply technician filter
+    if (filterTech && ticket.technicien_assigne != filterTech) return false;
+    
+    // Apply date filters
+    if (filterYear || filterMonth) {
+      const ticketDate = new Date(ticket.date_resolution || ticket.date_creation);
+      const ticketYear = ticketDate.getFullYear().toString();
+      const ticketMonth = (ticketDate.getMonth() + 1).toString().padStart(2, '0');
+      
+      if (filterYear && ticketYear !== filterYear) return false;
+      if (filterMonth && ticketMonth !== filterMonth) return false;
+    }
+    
+    return true;
+  });
+};
+
+// Filter chart data based on selected filters
+const getFilteredChartData = () => {
+  const filteredTickets = getFilteredTickets();
+  return generateTicketsChartData(filteredTickets);
+};
+
+// Filter pyramid data based on selected filters
+const getFilteredPyramidData = () => {
+  if (!filterYear && !filterMonth && !filterTech) {
+    return pyramidData;
+  }
+  
+  const filteredTickets = getFilteredTickets();
+  return generatePyramidData(filteredTickets, technicians);
+};
+
+const StatCard = ({ title, value, icon: Icon, bgColor, iconColor, textColor = '#1f2937', subtitle, onClick }) => (
 <div style={{
 backgroundColor: 'white',
 borderRadius: 16,
@@ -239,16 +420,22 @@ display: 'flex',
 alignItems: 'center',
 justifyContent: 'space-between',
 transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-cursor: 'pointer'
+cursor: onClick ? 'pointer' : 'default'
 }}
+onClick={onClick}
 onMouseEnter={(e) => {
-e.currentTarget.style.transform = 'translateY(-2px)';
-e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+if (onClick) {
+  e.currentTarget.style.transform = 'translateY(-2px)';
+  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+}
 }}
 onMouseLeave={(e) => {
-e.currentTarget.style.transform = 'translateY(0)';
-e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-}}>
+if (onClick) {
+  e.currentTarget.style.transform = 'translateY(0)';
+  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+}
+}}
+>
 <div>
   <p style={{
     color: '#6b7280',
@@ -398,6 +585,7 @@ return (
       bgColor="#ede9fe"
       iconColor="#7c3aed"
       subtitle="Utilisateurs actifs"
+      onClick={() => onNavigateToPage && onNavigateToPage('users')}
     />
     <StatCard
       title="Tickets totaux"
@@ -406,6 +594,7 @@ return (
       bgColor="#fef3c7"
       iconColor="#f59e0b"
       subtitle={`${stats.ticketsClosed} résolus`}
+      onClick={() => onNavigateToPage && onNavigateToPage('tickets')}
     />
     <StatCard
       title="Équipements"
@@ -414,6 +603,7 @@ return (
       bgColor="#dbeafe"
       iconColor="#3b82f6"
       subtitle={`${stats.equipmentsActive} actifs`}
+      onClick={() => onNavigateToPage && onNavigateToPage('equipements')}
     />
     <StatCard
       title="Pannes"
@@ -422,6 +612,7 @@ return (
       bgColor="#fed7d7"
       iconColor="#ef4444"
       subtitle="Équipements en maintenance"
+      onClick={() => onNavigateToPage && onNavigateToPage('equipements', 'en maintenance')}
     />
   </div>
 
@@ -438,6 +629,7 @@ return (
       icon={CheckCircle}
       bgColor="#d1fae5"
       iconColor="#10b981"
+      onClick={() => onNavigateToPage && onNavigateToPage('tickets', 'résolu')}
     />
     <StatCard
       title="En cours"
@@ -445,6 +637,7 @@ return (
       icon={Activity}
       bgColor="#dbeafe"
       iconColor="#3b82f6"
+      onClick={() => onNavigateToPage && onNavigateToPage('tickets', 'en cours')}
     />
     <StatCard
       title="En attente"
@@ -452,14 +645,212 @@ return (
       icon={Clock}
       bgColor="#fef3c7"
       iconColor="#f59e0b"
+      onClick={() => onNavigateToPage && onNavigateToPage('tickets', 'en attente')}
     />
     <StatCard
-      title="Ouverts"
+      title="Fermés"
       value={stats.ticketsOpen}
       icon={FileText}
       bgColor="#fed7d7"
       iconColor="#ef4444"
+      onClick={() => onNavigateToPage && onNavigateToPage('tickets', 'fermé')}
     />
+  </div>
+
+  {/* Filter Controls */}
+  <div style={{
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid #f1f5f9',
+    marginBottom: 32
+  }}>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 20
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Filter size={20} style={{ color: '#3b82f6' }} />
+        <h3 style={{
+          fontSize: 18,
+          fontWeight: 600,
+          color: '#1f2937',
+          margin: 0
+        }}>
+          Filtres des tickets résolus
+        </h3>
+      </div>
+      
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          onClick={() => setViewMode('line')}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: viewMode === 'line' ? '#3b82f6' : '#f8fafc',
+            color: viewMode === 'line' ? 'white' : '#6b7280',
+            border: '1px solid #d1d5db',
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 14,
+            fontWeight: 500
+          }}
+        >
+          <TrendingUp size={16} />
+          Évolution
+        </button>
+        <button
+          onClick={() => setViewMode('pyramid')}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: viewMode === 'pyramid' ? '#3b82f6' : '#f8fafc',
+            color: viewMode === 'pyramid' ? 'white' : '#6b7280',
+            border: '1px solid #d1d5db',
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 14,
+            fontWeight: 500
+          }}
+        >
+          <BarChart3 size={16} />
+          Pyramides
+        </button>
+      </div>
+    </div>
+    
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      gap: 16
+    }}>
+      <div>
+        <label style={{
+          display: 'block',
+          marginBottom: 8,
+          fontSize: 14,
+          fontWeight: 500,
+          color: '#374151'
+        }}>
+          Année
+        </label>
+        <select
+          value={filterYear}
+          onChange={(e) => setFilterYear(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: '1px solid #d1d5db',
+            borderRadius: 8,
+            fontSize: 14,
+            backgroundColor: 'white'
+          }}
+        >
+          <option value="">Toutes les années</option>
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+          <option value="2022">2022</option>
+        </select>
+      </div>
+      
+      <div>
+        <label style={{
+          display: 'block',
+          marginBottom: 8,
+          fontSize: 14,
+          fontWeight: 500,
+          color: '#374151'
+        }}>
+          Mois
+        </label>
+        <select
+          value={filterMonth}
+          onChange={(e) => setFilterMonth(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: '1px solid #d1d5db',
+            borderRadius: 8,
+            fontSize: 14,
+            backgroundColor: 'white'
+          }}
+        >
+          <option value="">Tous les mois</option>
+          <option value="01">Janvier</option>
+          <option value="02">Février</option>
+          <option value="03">Mars</option>
+          <option value="04">Avril</option>
+          <option value="05">Mai</option>
+          <option value="06">Juin</option>
+          <option value="07">Juillet</option>
+          <option value="08">Août</option>
+          <option value="09">Septembre</option>
+          <option value="10">Octobre</option>
+          <option value="11">Novembre</option>
+          <option value="12">Décembre</option>
+        </select>
+      </div>
+      
+      <div>
+        <label style={{
+          display: 'block',
+          marginBottom: 8,
+          fontSize: 14,
+          fontWeight: 500,
+          color: '#374151'
+        }}>
+          Technicien
+        </label>
+        <select
+          value={filterTech}
+          onChange={(e) => setFilterTech(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: '1px solid #d1d5db',
+            borderRadius: 8,
+            fontSize: 14,
+            backgroundColor: 'white'
+          }}
+        >
+          <option value="">Tous les techniciens</option>
+          {technicians.filter(user => user.role_id === 1 || user.role_id === 2).map(tech => (
+            <option key={tech.id_user} value={tech.id_user}>
+              {`${tech.prenom || ''} ${tech.nom || ''}`.trim() || `User #${tech.id_user}`} ({tech.role_id === 1 ? 'Admin' : 'Tech'})
+            </option>
+          ))}
+        </select>
+      </div>
+      
+      <div style={{ display: 'flex', alignItems: 'end' }}>
+        <button
+          onClick={() => {
+            setFilterYear('');
+            setFilterMonth('');
+            setFilterTech('');
+          }}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontSize: 14,
+            fontWeight: 500
+          }}
+        >
+          Réinitialiser
+        </button>
+      </div>
+    </div>
   </div>
 
   {/* Charts Section */}
@@ -469,14 +860,15 @@ return (
     gap: 24,
     marginBottom: 32
   }}>
-    {/* Area Chart */}
-    <div style={{
-      backgroundColor: 'white',
-      borderRadius: 20,
-      padding: 32,
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      border: '1px solid #f1f5f9'
-    }}>
+    {viewMode === 'line' ? (
+      /* Area Chart */
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: 20,
+        padding: 32,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        border: '1px solid #f1f5f9'
+      }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -505,7 +897,7 @@ return (
 
       <div style={{ height: 300, width: '100%' }}>
         <ResponsiveContainer>
-          <AreaChart data={chartData}>
+          <AreaChart data={getFilteredChartData()}>
             <defs>
               <linearGradient id="colorTickets" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
@@ -547,8 +939,217 @@ return (
         </ResponsiveContainer>
       </div>
     </div>
+    ) : (
+      /* Pyramid Chart */
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: 20,
+        padding: 32,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        border: '1px solid #f1f5f9'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 32
+        }}>
+          <div>
+            <h2 style={{
+              fontSize: 24,
+              fontWeight: 700,
+              color: '#1f2937',
+              margin: 0,
+              marginBottom: 4
+            }}>
+              Tickets résolus par catégorie
+            </h2>
+            <p style={{
+              color: '#6b7280',
+              margin: 0,
+              fontSize: 14
+            }}>
+              Performance des techniciens par type d'intervention
+            </p>
+          </div>
+        </div>
 
-    {/* Pie Chart */}
+        {/* Chart Container */}
+        <div style={{
+          position: 'relative',
+          height: 300,
+          marginBottom: 20,
+          padding: '0 40px 0 60px'
+        }}>
+          {/* Y-axis */}
+          <div style={{
+            position: 'absolute',
+            left: 40,
+            top: 20,
+            bottom: 60,
+            width: 2,
+            backgroundColor: '#e5e7eb'
+          }}>
+            {/* Y-axis labels */}
+            {(() => {
+              const maxValue = Math.max(
+                ...getFilteredPyramidData().flatMap(t => [t.HARDWARE, t.SOFTWARE, t.NETWORK]),
+                1
+              );
+              const steps = [maxValue, Math.ceil(maxValue * 0.75), Math.ceil(maxValue * 0.5), Math.ceil(maxValue * 0.25), 0];
+              return steps.map((value, index) => (
+                <div key={index} style={{
+                  position: 'absolute',
+                  top: `${(index / (steps.length - 1)) * 100}%`,
+                  right: 10,
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}>
+                  <span style={{
+                    fontSize: 12,
+                    color: '#6b7280',
+                    fontWeight: 500,
+                    minWidth: 20,
+                    textAlign: 'right'
+                  }}>
+                    {value}
+                  </span>
+                  <div style={{
+                    width: 8,
+                    height: 1,
+                    backgroundColor: '#e5e7eb'
+                  }} />
+                </div>
+              ));
+            })()}
+          </div>
+
+          {/* Chart Bars */}
+          <div style={{
+            position: 'absolute',
+            left: 60,
+            right: 40,
+            top: 20,
+            bottom: 60,
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'space-around',
+            gap: 15
+          }}>
+            {getFilteredPyramidData().slice(0, 6).map((tech, index) => {
+              const maxValue = Math.max(
+                ...getFilteredPyramidData().flatMap(t => [t.HARDWARE, t.SOFTWARE, t.NETWORK]),
+                1
+              );
+              
+              return (
+                <div key={tech.techId} style={{
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  gap: 2,
+                  position: 'relative'
+                }}>
+                  {/* Hardware Bar */}
+                  <div style={{
+                    width: 28,
+                    height: Math.max((tech.HARDWARE / maxValue) * 180, tech.HARDWARE > 0 ? 15 : 0),
+                    backgroundColor: '#ef4444',
+                    borderRadius: '3px 3px 0 0',
+                    transition: 'all 0.2s ease'
+                  }} />
+                  
+                  {/* Software Bar */}
+                  <div style={{
+                    width: 28,
+                    height: Math.max((tech.SOFTWARE / maxValue) * 180, tech.SOFTWARE > 0 ? 15 : 0),
+                    backgroundColor: '#3b82f6',
+                    borderRadius: '3px 3px 0 0',
+                    transition: 'all 0.2s ease'
+                  }} />
+                  
+                  {/* Network Bar */}
+                  <div style={{
+                    width: 28,
+                    height: Math.max((tech.NETWORK / maxValue) * 180, tech.NETWORK > 0 ? 15 : 0),
+                    backgroundColor: '#10b981',
+                    borderRadius: '3px 3px 0 0',
+                    transition: 'all 0.2s ease'
+                  }} />
+                  
+                  {/* Technician name */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: -25,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#374151',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {tech.technician.split(' ')[0]}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        {/* Legend */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 32,
+          marginTop: 10,
+          padding: '16px 0',
+          borderTop: '1px solid #e5e7eb'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 16,
+              height: 16,
+              backgroundColor: '#ef4444',
+              borderRadius: 3
+            }} />
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>HARDWARE</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 16,
+              height: 16,
+              backgroundColor: '#3b82f6',
+              borderRadius: 3
+            }} />
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>SOFTWARE</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 16,
+              height: 16,
+              backgroundColor: '#10b981',
+              borderRadius: 3
+            }} />
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>NETWORK</span>
+          </div>
+        </div>
+        
+        {getFilteredPyramidData().length === 0 && (
+          <div style={{
+            textAlign: 'center',
+            color: '#6b7280',
+            fontSize: 14,
+            padding: '40px 0'
+          }}>
+            Aucun ticket résolu trouvé
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* Pie Chart - Always visible on the right */}
     <div style={{
       backgroundColor: 'white',
       borderRadius: 20,
@@ -609,8 +1210,9 @@ return (
       </div>
     </div>
   </div>
+</div>
 
-  {/* Performance Cards */}
+{/* Performance Cards */}
   <div style={{
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
@@ -704,7 +1306,6 @@ return (
       </p>
     </div>
   </div>
-</div>
 </>
 );
 };

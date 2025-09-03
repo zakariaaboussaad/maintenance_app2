@@ -56,8 +56,10 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
     weeklyReport: false
   });
 
-  // Password requests state
+  // Password reset requests state
   const [passwordRequests, setPasswordRequests] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 2;
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -151,20 +153,35 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
     }, 1000);
   };
 
-  // Load password requests when component mounts or when password-requests tab is active
+  // Load password reset requests when component mounts or when password-requests tab is active
   useEffect(() => {
     if (activeTab === 'password-requests') {
-      loadPasswordRequests();
+      loadPasswordResetRequests();
     }
   }, [activeTab]);
 
-  const loadPasswordRequests = async () => {
+  const loadPasswordResetRequests = async () => {
     try {
       setLoading(true);
-      const response = await apiService.auth.getPasswordRequests();
-      setPasswordRequests(response.data);
+      
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/password-reset-requests', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setPasswordRequests(result.data || []);
+      } else {
+        showMessage('Erreur lors du chargement des demandes', 'error');
+      }
     } catch (error) {
-      console.error('Error loading password requests:', error);
+      console.error('Error loading password reset requests:', error);
       showMessage('Erreur lors du chargement des demandes', 'error');
     } finally {
       setLoading(false);
@@ -179,12 +196,29 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
 
     setActionLoading(true);
     try {
-      await apiService.auth.approvePasswordRequest(selectedRequest.id, { new_password: newPassword });
-      showMessage('Demande approuvée avec succès', 'success');
-      setShowApproveModal(false);
-      setNewPassword('');
-      setSelectedRequest(null);
-      loadPasswordRequests();
+      const token = localStorage.getItem('token');
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      const response = await fetch(`/api/password-reset-requests/${selectedRequest.id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+          ...(csrfToken && { 'X-CSRF-TOKEN': csrfToken })
+        },
+        body: JSON.stringify({ new_password: newPassword })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        showMessage('Demande approuvée avec succès', 'success');
+        setShowApproveModal(false);
+        setNewPassword('');
+        setSelectedRequest(null);
+        loadPasswordResetRequests();
+      } else {
+        showMessage(result.message || 'Erreur lors de l\'approbation', 'error');
+      }
     } catch (error) {
       showMessage('Erreur lors de l\'approbation', 'error');
     } finally {
@@ -195,12 +229,29 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
   const handleReject = async () => {
     setActionLoading(true);
     try {
-      await apiService.auth.rejectPasswordRequest(selectedRequest.id, { rejection_reason: rejectionReason });
-      showMessage('Demande rejetée', 'success');
-      setShowRejectModal(false);
-      setRejectionReason('');
-      setSelectedRequest(null);
-      loadPasswordRequests();
+      const token = localStorage.getItem('token');
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      const response = await fetch(`/api/password-reset-requests/${selectedRequest.id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+          ...(csrfToken && { 'X-CSRF-TOKEN': csrfToken })
+        },
+        body: JSON.stringify({ rejection_reason: rejectionReason })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        showMessage('Demande rejetée', 'success');
+        setShowRejectModal(false);
+        setRejectionReason('');
+        setSelectedRequest(null);
+        loadPasswordResetRequests();
+      } else {
+        showMessage(result.message || 'Erreur lors du rejet', 'error');
+      }
     } catch (error) {
       showMessage('Erreur lors du rejet', 'error');
     } finally {
@@ -217,11 +268,23 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
     setNewPassword(password);
   };
 
+  // Pagination calculations for password requests
+  const totalPages = Math.ceil(passwordRequests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentRequests = passwordRequests.slice(startIndex, endIndex);
+
+  const handlePreviousPage = () => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
+
   const tabs = [
     { id: 'profile', label: 'Profil', icon: User },
     { id: 'password', label: 'Mot de passe', icon: Lock },
-    { id: 'notifications', label: 'Notifications', icon: Mail },
-    { id: 'password-requests', label: 'Demandes de Mot de Passe', icon: Key },
     { id: 'appearance', label: 'Apparence', icon: darkTheme ? Moon : Sun }
   ];
 
@@ -361,7 +424,7 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                     </p>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginBottom: '32px' }}>
                     <div>
                       <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
                         Prénom *
@@ -487,7 +550,7 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           type={showCurrentPassword ? 'text' : 'password'}
                           value={passwordData.current_password}
                           onChange={(e) => setPasswordData({...passwordData, current_password: e.target.value})}
-                          style={{ ...inputStyle, paddingRight: '48px' }}
+                          style={{ ...inputStyle, paddingRight: '40px' }}
                           placeholder="Votre mot de passe actuel"
                         />
                         <button
@@ -495,7 +558,7 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                           style={{
                             position: 'absolute',
-                            right: '12px',
+                            right: '8px',
                             top: '50%',
                             transform: 'translateY(-50%)',
                             background: 'none',
@@ -518,7 +581,7 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           type={showNewPassword ? 'text' : 'password'}
                           value={passwordData.new_password}
                           onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})}
-                          style={{ ...inputStyle, paddingRight: '48px' }}
+                          style={{ ...inputStyle, paddingRight: '40px' }}
                           placeholder="Nouveau mot de passe (min. 6 caractères)"
                         />
                         <button
@@ -526,7 +589,7 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           onClick={() => setShowNewPassword(!showNewPassword)}
                           style={{
                             position: 'absolute',
-                            right: '12px',
+                            right: '8px',
                             top: '50%',
                             transform: 'translateY(-50%)',
                             background: 'none',
@@ -549,7 +612,7 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           type={showConfirmPassword ? 'text' : 'password'}
                           value={passwordData.confirm_password}
                           onChange={(e) => setPasswordData({...passwordData, confirm_password: e.target.value})}
-                          style={{ ...inputStyle, paddingRight: '48px' }}
+                          style={{ ...inputStyle, paddingRight: '40px' }}
                           placeholder="Confirmez le nouveau mot de passe"
                         />
                         <button
@@ -557,7 +620,7 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                           style={{
                             position: 'absolute',
-                            right: '12px',
+                            right: '8px',
                             top: '50%',
                             transform: 'translateY(-50%)',
                             background: 'none',
@@ -720,10 +783,10 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                 <div>
                   <div style={{ marginBottom: '32px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
-                      Demandes de Mot de Passe
+                      Demandes de Réinitialisation de Mot de Passe
                     </h2>
                     <p style={{ color: darkTheme ? '#d1d5db' : '#64748b' }}>
-                      Gérez les demandes de changement de mot de passe des utilisateurs
+                      Gérez les demandes de réinitialisation de mot de passe (mot de passe oublié)
                     </p>
                   </div>
 
@@ -740,131 +803,243 @@ const AdminSettingsPage = ({ user, darkTheme, setDarkTheme }) => {
                       border: `1px dashed ${darkTheme ? '#374151' : '#d1d5db'}`,
                       borderRadius: '12px'
                     }}>
-                      <Key size={48} style={{ color: darkTheme ? '#6b7280' : '#9ca3af', marginBottom: '16px' }} />
+                      <Key size={24} style={{ color: darkTheme ? '#6b7280' : '#9ca3af', marginBottom: '16px' }} />
                       <h3 style={{ margin: '0 0 8px 0', color: darkTheme ? '#d1d5db' : '#64748b' }}>
                         Aucune demande en attente
                       </h3>
                       <p style={{ margin: 0, color: darkTheme ? '#9ca3af' : '#6b7280' }}>
-                        Les demandes de changement de mot de passe apparaîtront ici
+                        Les demandes de réinitialisation de mot de passe apparaîtront ici
                       </p>
                     </div>
                   ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ 
-                        width: '100%', 
-                        borderCollapse: 'collapse',
-                        backgroundColor: darkTheme ? '#1f2937' : '#ffffff',
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        border: `1px solid ${darkTheme ? '#374151' : '#e5e7eb'}`
-                      }}>
-                        <thead>
-                          <tr style={{ backgroundColor: darkTheme ? '#374151' : '#f9fafb' }}>
-                            <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600' }}>Utilisateur</th>
-                            <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600' }}>Raison</th>
-                            <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600' }}>Date</th>
-                            <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600' }}>Statut</th>
-                            <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600' }}>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {passwordRequests.map((request) => (
-                            <tr key={request.id} style={{ 
-                              borderTop: `1px solid ${darkTheme ? '#374151' : '#e5e7eb'}`,
-                              '&:hover': { backgroundColor: darkTheme ? '#374151' : '#f9fafb' }
-                            }}>
-                              <td style={{ padding: '16px' }}>
-                                <div>
-                                  <div style={{ fontWeight: '600' }}>
-                                    {request.user?.nom} {request.user?.prenom}
-                                  </div>
-                                  <div style={{ fontSize: '14px', color: darkTheme ? '#9ca3af' : '#6b7280' }}>
-                                    {request.user?.email}
-                                  </div>
-                                </div>
-                              </td>
-                              <td style={{ padding: '16px' }}>
-                                <div style={{ maxWidth: '200px' }}>
-                                  {request.reason || 'Aucune raison fournie'}
-                                </div>
-                              </td>
-                              <td style={{ padding: '16px' }}>
-                                <div style={{ fontSize: '14px' }}>
-                                  {new Date(request.requested_at).toLocaleDateString('fr-FR')}
-                                </div>
-                                <div style={{ fontSize: '12px', color: darkTheme ? '#9ca3af' : '#6b7280' }}>
-                                  {new Date(request.requested_at).toLocaleTimeString('fr-FR')}
-                                </div>
-                              </td>
-                              <td style={{ padding: '16px' }}>
-                                <span style={{
-                                  padding: '4px 12px',
-                                  borderRadius: '20px',
-                                  fontSize: '12px',
-                                  fontWeight: '600',
-                                  backgroundColor: request.status === 'pending' ? '#fef3c7' : 
-                                                 request.status === 'approved' ? '#d1fae5' : '#fee2e2',
-                                  color: request.status === 'pending' ? '#92400e' :
-                                         request.status === 'approved' ? '#065f46' : '#dc2626'
-                                }}>
-                                  {request.status === 'pending' ? 'En attente' :
-                                   request.status === 'approved' ? 'Approuvée' : 'Rejetée'}
+                    <div className="space-y-4">
+                      {currentRequests.map((request) => (
+                        <div 
+                          key={request.id} 
+                          style={{
+                            backgroundColor: darkTheme ? '#1f2937' : '#ffffff',
+                            border: `1px solid ${darkTheme ? '#374151' : '#e5e7eb'}`,
+                            borderRadius: '8px',
+                            padding: '20px',
+                            boxShadow: darkTheme ? 'none' : '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                            transition: 'all 0.2s ease'
+                          }}
+                          className="hover:shadow-md"
+                        >
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                              <div 
+                                style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  backgroundColor: '#3b82f6',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <span style={{ color: 'white', fontWeight: '600', fontSize: '14px' }}>
+                                  {request.nom?.split(' ').map(n => n[0]).join('').toUpperCase()}
                                 </span>
-                              </td>
-                              <td style={{ padding: '16px', textAlign: 'center' }}>
-                                {request.status === 'pending' && (
-                                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                    <button
-                                      onClick={() => {
-                                        setSelectedRequest(request);
-                                        setShowApproveModal(true);
-                                      }}
-                                      style={{
-                                        padding: '8px 16px',
-                                        backgroundColor: '#10b981',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        fontSize: '14px',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                      }}
-                                    >
-                                      <Check size={14} />
-                                      Approuver
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setSelectedRequest(request);
-                                        setShowRejectModal(true);
-                                      }}
-                                      style={{
-                                        padding: '8px 16px',
-                                        backgroundColor: '#ef4444',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        fontSize: '14px',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                      }}
-                                    >
-                                      <X size={14} />
-                                      Rejeter
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              </div>
+                              <div>
+                                <h3 style={{ 
+                                  margin: '0 0 4px 0', 
+                                  fontWeight: '600', 
+                                  fontSize: '16px',
+                                  color: darkTheme ? '#f9fafb' : '#111827'
+                                }}>
+                                  {request.nom}
+                                </h3>
+                                <p style={{ 
+                                  margin: 0, 
+                                  fontSize: '14px', 
+                                  color: darkTheme ? '#9ca3af' : '#6b7280'
+                                }}>
+                                  {request.email}
+                                </p>
+                              </div>
+                            </div>
+                            <span 
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '4px 12px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                borderRadius: '9999px',
+                                backgroundColor: request.status === 'pending' ? '#fef3c7' : 
+                                                request.status === 'approved' ? '#d1fae5' : '#fecaca',
+                                color: request.status === 'pending' ? '#92400e' :
+                                       request.status === 'approved' ? '#065f46' : '#991b1b'
+                              }}
+                            >
+                              {request.status === 'pending' ? 'En attente' :
+                               request.status === 'approved' ? 'Approuvée' : 'Rejetée'}
+                            </span>
+                          </div>
+                          
+                          <div style={{ marginBottom: '16px' }}>
+                            <p style={{ 
+                              margin: '0 0 4px 0', 
+                              fontSize: '13px', 
+                              fontWeight: '500',
+                              color: darkTheme ? '#d1d5db' : '#374151'
+                            }}>
+                              Raison:
+                            </p>
+                            <p style={{ 
+                              margin: 0, 
+                              fontSize: '14px', 
+                              color: darkTheme ? '#9ca3af' : '#6b7280'
+                            }}>
+                              {request.reason || 'Mot de passe oublié'}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <p style={{ 
+                              margin: 0, 
+                              fontSize: '12px', 
+                              color: darkTheme ? '#9ca3af' : '#6b7280'
+                            }}>
+                              {new Date(request.created_at).toLocaleDateString('fr-FR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+
+                            {request.status === 'pending' && (
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedRequest(request);
+                                    setShowApproveModal(true);
+                                  }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    padding: '8px 16px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    color: 'white',
+                                    backgroundColor: '#10b981',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s ease'
+                                  }}
+                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                                  onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                                >
+                                  Approuver
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedRequest(request);
+                                    setShowRejectModal(true);
+                                  }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    padding: '8px 16px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    color: 'white',
+                                    backgroundColor: '#ef4444',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s ease'
+                                  }}
+                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
+                                  onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+                                >
+                                  Rejeter
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
+
+                  {/* Pagination Controls */}
+                  {passwordRequests.length > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: '24px',
+                        padding: '16px 0'
+                      }}>
+                        <div style={{ fontSize: '14px', color: darkTheme ? '#9ca3af' : '#6b7280' }}>
+                          Affichage de {startIndex + 1} à {Math.min(endIndex, passwordRequests.length)} sur {passwordRequests.length} demandes
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button
+                            onClick={handlePreviousPage}
+                            disabled={currentPage === 1}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '8px 12px',
+                              backgroundColor: currentPage === 1 ? (darkTheme ? '#374151' : '#f3f4f6') : (darkTheme ? '#1f2937' : 'white'),
+                              color: currentPage === 1 ? (darkTheme ? '#6b7280' : '#9ca3af') : (darkTheme ? '#d1d5db' : '#374151'),
+                              border: `1px solid ${darkTheme ? '#4b5563' : '#d1d5db'}`,
+                              borderRadius: '8px',
+                              fontSize: '14px',
+                              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                              <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                            </svg>
+                            Précédent
+                          </button>
+                          
+                          <span style={{
+                            padding: '8px 12px',
+                            fontSize: '14px',
+                            color: darkTheme ? '#d1d5db' : '#374151',
+                            fontWeight: '500'
+                          }}>
+                            Page {currentPage} sur {totalPages}
+                          </span>
+                          
+                          <button
+                            onClick={handleNextPage}
+                            disabled={currentPage === totalPages}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '8px 12px',
+                              backgroundColor: currentPage === totalPages ? (darkTheme ? '#374151' : '#f3f4f6') : (darkTheme ? '#1f2937' : 'white'),
+                              color: currentPage === totalPages ? (darkTheme ? '#6b7280' : '#9ca3af') : (darkTheme ? '#d1d5db' : '#374151'),
+                              border: `1px solid ${darkTheme ? '#4b5563' : '#d1d5db'}`,
+                              borderRadius: '8px',
+                              fontSize: '14px',
+                              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            Suivant
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                              <path fillRule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                 </div>
               )}
 

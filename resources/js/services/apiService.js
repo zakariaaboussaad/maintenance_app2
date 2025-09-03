@@ -48,9 +48,11 @@ const makeApiRequest = async (url, options = {}) => {
         headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
-        }
+        },
+        credentials: 'include' // Include cookies for session-based auth
     };
 
+    // Only add Authorization header if we have a real token (not demo)
     if (authToken && !authToken.startsWith('demo_token_')) {
         defaultOptions.headers['Authorization'] = `Bearer ${authToken}`;
     }
@@ -106,29 +108,7 @@ const makeApiRequest = async (url, options = {}) => {
 // Auth API functions
 export const authService = {
     async login(email, password) {
-        // First, try demo login for known demo accounts
-        const emailLower = email.toLowerCase();
-        if (demoAccounts[emailLower]) {
-            if (demoAccounts[emailLower].password === password) {
-                console.log(`✅ Demo account found: ${emailLower}`);
-                const account = demoAccounts[emailLower];
-                const demoUser = {
-                    id: account.id,
-                    name: account.name,
-                    email: email,
-                    role_id: account.role_id,
-                    prenom: account.prenom,
-                    nom: account.nom
-                };
-
-                authToken = 'demo_token_' + Date.now();
-                return { success: true, user: demoUser, token: authToken };
-            } else {
-                return { success: false, message: 'Email ou mot de passe incorrect' };
-            }
-        }
-
-        // Try to connect to Laravel API
+        // Try to connect to Laravel API with session-based auth
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
@@ -136,16 +116,17 @@ export const authService = {
             });
 
             if (result.success && result.user) {
-                authToken = result.token || 'api_token_' + Date.now();
-                console.log('✅ Real API login successful');
+                // Store token if provided (for compatibility)
+                authToken = result.token || 'session_auth_' + Date.now();
+                console.log('✅ API login successful with session auth');
                 return { success: true, user: result.user, token: authToken };
             } else {
                 return { success: false, message: result.message || 'Login failed' };
             }
 
         } catch (error) {
-            console.log('🔌 API unavailable, use demo accounts for testing');
-            return { success: false, message: 'Unable to connect to server. Use demo accounts for testing.' };
+            console.log('🔌 API connection failed:', error.message);
+            return { success: false, message: 'Unable to connect to server: ' + error.message };
         }
     },
 
@@ -161,11 +142,11 @@ export const authService = {
         return authToken && authToken.startsWith('demo_token_');
     },
 
-    async getCurrentUser() {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
+    isSessionAuth() {
+        return authToken && authToken.startsWith('session_auth_');
+    },
 
+    async getCurrentUser() {
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/auth/me`, {
                 method: 'GET'
@@ -183,10 +164,6 @@ export const authService = {
     },
 
     async updateProfile(profileData) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/profile`, {
                 method: 'PUT',
@@ -205,10 +182,6 @@ export const authService = {
     },
 
     async requestPasswordChange(requestData) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/password-requests`, {
                 method: 'POST',
@@ -227,10 +200,6 @@ export const authService = {
     },
 
     async getPasswordRequests() {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/password-requests`);
 
@@ -246,10 +215,6 @@ export const authService = {
     },
 
     async approvePasswordRequest(requestId, newPassword) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/password-requests/${requestId}/approve`, {
                 method: 'POST',
@@ -268,10 +233,6 @@ export const authService = {
     },
 
     async rejectPasswordRequest(requestId, reason) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/password-requests/${requestId}/reject`, {
                 method: 'POST',
@@ -293,10 +254,6 @@ export const authService = {
 // Equipment API functions
 export const equipmentService = {
     async getEquipements() {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/equipements`);
 
@@ -313,10 +270,6 @@ export const equipmentService = {
     },
 
     async getUserEquipements(userId) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/equipements/user/${userId}`);
 
@@ -336,10 +289,6 @@ export const equipmentService = {
 // Tickets API functions
 export const ticketService = {
     async getUserTickets(userId) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/tickets/user/${userId}`);
 
@@ -356,10 +305,6 @@ export const ticketService = {
     },
 
     async getAllTickets() {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/tickets`);
 
@@ -376,10 +321,6 @@ export const ticketService = {
     },
 
     async checkTicketAssignment(ticketId) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/tickets/${ticketId}/check-assignment`);
 
@@ -400,10 +341,6 @@ export const ticketService = {
     },
 
     async assignTicket(ticketId, technicianId) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/tickets/${ticketId}/assign`, {
                 method: 'POST',
@@ -423,10 +360,6 @@ export const ticketService = {
     },
 
     async updateTicket(ticketId, payload) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         console.log(`🔧 Updating ticket ${ticketId} with payload:`, payload);
 
         try {
@@ -465,10 +398,6 @@ export const ticketService = {
     },
 
     async getTechnicianTickets(technicianId) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/tickets/technician/${technicianId}`);
 
@@ -488,14 +417,12 @@ export const ticketService = {
 // Users API functions
 export const userService = {
     async getAllUsers() {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/utilisateurs`);
 
-            if (result.success && Array.isArray(result.data)) {
+            if (result.success && Array.isArray(result.users)) {
+                return { success: true, data: result.users };
+            } else if (result.success && Array.isArray(result.data)) {
                 return { success: true, data: result.data };
             } else {
                 throw new Error('Invalid response format from users API');
@@ -536,10 +463,6 @@ export const checkApiHealth = async () => {
 // Notification API functions
 export const notificationService = {
     async getNotifications() {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/notifications`);
 
@@ -555,10 +478,6 @@ export const notificationService = {
     },
 
     async markAsRead(notificationId) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/notifications/${notificationId}/read`, {
                 method: 'POST'
@@ -576,10 +495,6 @@ export const notificationService = {
     },
 
     async markAllAsRead() {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/notifications/mark-all-read`, {
                 method: 'POST'
@@ -640,10 +555,6 @@ export const notificationService = {
     },
 
     async updatePreferences(preferences) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
-
         try {
             const result = await makeApiRequest(`${API_BASE_URL}/notification-preferences`, {
                 method: 'PUT',
@@ -693,16 +604,10 @@ export const debugApi = {
 const apiService = {
     // HTTP methods
     async get(endpoint) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
         return await makeApiRequest(`${API_BASE_URL}${endpoint}`);
     },
 
     async post(endpoint, data) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
         return await makeApiRequest(`${API_BASE_URL}${endpoint}`, {
             method: 'POST',
             body: JSON.stringify(data)
@@ -710,9 +615,6 @@ const apiService = {
     },
 
     async put(endpoint, data) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
         return await makeApiRequest(`${API_BASE_URL}${endpoint}`, {
             method: 'PUT',
             body: JSON.stringify(data)
@@ -720,9 +622,6 @@ const apiService = {
     },
 
     async delete(endpoint) {
-        if (authService.isDemoMode()) {
-            throw new Error('Demo mode - API unavailable. Please restart with real API connection.');
-        }
         return await makeApiRequest(`${API_BASE_URL}${endpoint}`, {
             method: 'DELETE'
         });

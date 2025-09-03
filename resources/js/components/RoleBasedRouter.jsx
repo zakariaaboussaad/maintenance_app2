@@ -6,7 +6,7 @@ import TechnicianDashboard from './dashboards/TechnicianDashboard';
 import UserDashboard from './dashboards/UserDashboard';
 import { authService } from '../services/apiService';
 
-const RoleBasedRouter = ({ user, onLogout }) => {
+const RoleBasedRouter = ({ user, onLogout, mustChangePassword, onPasswordChanged }) => {
     const handleLogout = () => {
         authService.logout();
         onLogout();
@@ -14,11 +14,11 @@ const RoleBasedRouter = ({ user, onLogout }) => {
 
     switch (user?.role_id) {
         case 1: // Admin
-            return <AdminDashboard user={user} onLogout={handleLogout} />;
+            return <AdminDashboard user={user} onLogout={handleLogout} mustChangePassword={mustChangePassword} onPasswordChanged={onPasswordChanged} />;
         case 2: // Technicien
-            return <TechnicianDashboard user={user} onLogout={handleLogout} />;
+            return <TechnicianDashboard user={user} onLogout={handleLogout} mustChangePassword={mustChangePassword} onPasswordChanged={onPasswordChanged} />;
         case 3: // Utilisateur
-            return <UserDashboard user={user} onLogout={handleLogout} />;
+            return <UserDashboard user={user} onLogout={handleLogout} mustChangePassword={mustChangePassword} onPasswordChanged={onPasswordChanged} />;
         default:
             return (
                 <div style={{

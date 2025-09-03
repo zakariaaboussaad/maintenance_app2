@@ -4,31 +4,64 @@
 echo "=== Testing Laravel Logging ===\n";
 
 require_once 'vendor/autoload.php';
+
+// Load Laravel app
 $app = require_once 'bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel->bootstrap();
 
-// Test basic logging
-\Log::info('TEST LOG MESSAGE - PHP script working');
-echo "✅ Log message sent\n";
+echo "=== Checking Password Reset Emails for aboussaadzakaria7@gmail.com ===" . PHP_EOL;
 
-// Check if log file exists
-$logPath = storage_path('logs/laravel.log');
-echo "Log file path: $logPath\n";
-
-if (file_exists($logPath)) {
-    echo "✅ Log file exists\n";
-    $size = filesize($logPath);
-    echo "Log file size: $size bytes\n";
+$logFile = 'storage/logs/laravel.log';
+if (file_exists($logFile)) {
+    $logContent = file_get_contents($logFile);
     
-    // Read last few lines
-    $lines = file($logPath);
-    $lastLines = array_slice($lines, -10);
-    echo "\nLast 10 log entries:\n";
-    foreach ($lastLines as $line) {
-        echo $line;
+    // Search for your specific email
+    if (strpos($logContent, 'aboussaadzakaria7@gmail.com') !== false) {
+        echo "✅ Found entries for aboussaadzakaria7@gmail.com in logs!" . PHP_EOL;
+        
+        // Extract email content
+        $lines = explode("\n", $logContent);
+        $emailLines = [];
+        
+        foreach ($lines as $line) {
+            if (stripos($line, 'aboussaadzakaria7@gmail.com') !== false ||
+                stripos($line, 'password reset') !== false ||
+                stripos($line, 'TempPassword') !== false ||
+                stripos($line, 'PasswordResetApproved') !== false) {
+                $emailLines[] = $line;
+            }
+        }
+        
+        echo "Recent email entries:" . PHP_EOL;
+        foreach (array_slice($emailLines, -5) as $line) {
+            echo $line . PHP_EOL;
+        }
+        
+        // Look for the actual email content in logs
+        if (strpos($logContent, 'Message-ID:') !== false) {
+            echo PHP_EOL . "📧 Email content found in logs (showing last email):" . PHP_EOL;
+            $emailStart = strrpos($logContent, 'Message-ID:');
+            if ($emailStart !== false) {
+                $emailContent = substr($logContent, $emailStart, 2000);
+                echo substr($emailContent, 0, 1000) . "..." . PHP_EOL;
+            }
+        }
+        
+    } else {
+        echo "❌ No entries found for aboussaadzakaria7@gmail.com" . PHP_EOL;
     }
 } else {
-    echo "❌ Log file does not exist\n";
+    echo "❌ Log file not found: $logFile" . PHP_EOL;
+}
+
+echo PHP_EOL . "Mail configuration:" . PHP_EOL;
+echo "MAIL_MAILER: " . config('mail.default') . PHP_EOL;
+echo "MAIL_FROM: " . config('mail.from.address') . PHP_EOL;
+
+if (config('mail.default') === 'log') {
+    echo PHP_EOL . "⚠️  MAIL_MAILER is set to 'log' - emails are saved to log files, not sent!" . PHP_EOL;
+    echo "To send real emails, change MAIL_MAILER to 'smtp' in .env file" . PHP_EOL;
 }
 
 // Test notification creation directly

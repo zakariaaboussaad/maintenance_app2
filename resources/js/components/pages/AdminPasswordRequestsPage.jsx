@@ -11,6 +11,8 @@ const AdminPasswordRequestsPage = () => {
     const [newPassword, setNewPassword] = useState('');
     const [rejectionReason, setRejectionReason] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 2;
 
     useEffect(() => {
         loadPasswordRequests();
@@ -107,6 +109,27 @@ const AdminPasswordRequestsPage = () => {
         setNewPassword(password);
     };
 
+    // Pagination calculations
+    const totalPages = Math.ceil(requests.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentRequests = requests.slice(startIndex, endIndex);
+    
+    console.log('Pagination Debug:', { 
+        totalRequests: requests.length, 
+        currentPage, 
+        totalPages, 
+        currentRequestsCount: currentRequests.length 
+    });
+
+    const handlePreviousPage = () => {
+        setCurrentPage(prev => Math.max(prev - 1, 1));
+    };
+
+    const handleNextPage = () => {
+        setCurrentPage(prev => Math.min(prev + 1, totalPages));
+    };
+
     if (loading) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
@@ -123,7 +146,7 @@ const AdminPasswordRequestsPage = () => {
                     Demandes de Mot de Passe
                 </h1>
                 <p style={{ color: '#6b7280', fontSize: '16px' }}>
-                    Gérez les demandes de changement de mot de passe des utilisateurs
+                    Gérez les demandes de changement de mot de passe des utilisateurs (Page {currentPage}/{totalPages})
                 </p>
             </div>
 
@@ -167,7 +190,7 @@ const AdminPasswordRequestsPage = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {requests.map((request) => (
+                                {currentRequests.map((request) => (
                                     <tr key={request.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
                                         <td style={{ padding: '16px' }}>
                                             <div>
@@ -248,6 +271,78 @@ const AdminPasswordRequestsPage = () => {
                     </div>
                 )}
             </div>
+
+            {/* Pagination Controls */}
+            {requests.length > 0 && (
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginTop: '24px',
+                    padding: '16px 0'
+                }}>
+                    <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                        Affichage de {startIndex + 1} à {Math.min(endIndex, requests.length)} sur {requests.length} demandes
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                            onClick={handlePreviousPage}
+                            disabled={currentPage === 1}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '8px 12px',
+                                backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+                                color: currentPage === 1 ? '#9ca3af' : '#374151',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                            </svg>
+                            Précédent
+                        </button>
+                        
+                        <span style={{
+                            padding: '8px 12px',
+                            fontSize: '14px',
+                            color: '#374151',
+                            fontWeight: '500'
+                        }}>
+                            Page {currentPage} sur {totalPages}
+                        </span>
+                        
+                        <button
+                            onClick={handleNextPage}
+                            disabled={currentPage === totalPages}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '8px 12px',
+                                backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+                                color: currentPage === totalPages ? '#9ca3af' : '#374151',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            Suivant
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path fillRule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Approve Modal */}
             {showApproveModal && (
